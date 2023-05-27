@@ -1,0 +1,8 @@
+{
+    "name": "@jauza/core",
+    "version": "1.0.0",
+    "dependencies": {},
+    "devDependencies": {
+        "jest": "^29.5.0"
+    }
+}

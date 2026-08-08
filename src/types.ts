@@ -1,10 +1,12 @@
 import type { JulianCalendar } from "./modules/calendar/julian.js";
+import type { Hijri } from "./modules/calendar/hijri.js";
 
 export type Vec3 = [number, number, number];
 export type Algo = (time: Date) => Vec3;
 export type DateParams =
   | [date: Date]
   | [julianDate: JulianCalendar]
+  | [hijriDate: Hijri]
   | [year: number]
   | [year: number, month: number]
   | [year: number, month: number, day: number]

@@ -1,9 +1,9 @@
-export function hello() {
-  return "hello";
-}
+export { Earth } from "./modules/earth.js";
+export { JulianCalendar } from "./modules/calendar/julian.js";
+export { getJD } from "./utils/time.js";
 
 export function getEnv() {
-  if (typeof window === "undefined" && typeof document === "undefined") {
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
     return "browser";
   } else if (
     typeof process !== "undefined" &&

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getJD } from "./time.js";
+import { getJD, jdToDate } from "./time.js";
 import { JulianCalendar } from "../modules/calendar/julian.js";
 
 describe("getJD", () => {
@@ -19,5 +19,27 @@ describe("getJD", () => {
     const date = new JulianCalendar(-2961, 1, 1, 19, 47, 4);
     const jd = getJD(date);
     expect(jd).toBeCloseTo(639553.32435, 5);
+  });
+
+  it("should return 856 days for date difference between 11 July 2010 and 13 November 2012", () => {
+    const date1 = new JulianCalendar(2010, 7, 11);
+    const date2 = new JulianCalendar(2012, 11, 13);
+    const jd1 = getJD(date1);
+    const jd2 = getJD(date2);
+    expect(jd2 - jd1).toBe(856);
+  });
+
+  it("should return  29 Februari 2016 pukul 10:48:43.2 for JD 2457447.9505", () => {
+    const jd = 2457447.9505;
+    const date = jdToDate(jd);
+    expect(date).toEqual({
+      year: 2016,
+      month: 2,
+      day: 29,
+      hour: 10,
+      minute: 48,
+      second: 43,
+      ms: 43200,
+    });
   });
 });

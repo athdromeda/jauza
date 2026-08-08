@@ -8,3 +8,11 @@ export const degToHms = (deg: number) => {
 export const hmsToDeg = (hours: number, minutes: number, seconds: number) => {
   return hours * 15 + minutes * 0.25 + seconds * 0.004166666666666667;
 };
+
+export const decToHms = (dec: number) => {
+  const hours = Math.floor(dec);
+  const minutes = Math.floor((dec % 1) * 60);
+  const seconds = Math.round(((dec % 1) * 60 - minutes) * 60);
+  const ms = Math.round(((dec % 1) * 60 - minutes) * 60 * 1000);
+  return { hours, minutes, seconds, ms };
+};

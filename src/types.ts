@@ -1,24 +1,29 @@
-import type { JulianCalendar } from "./modules/calendar/julian.js";
-import type { Hijri } from "./modules/calendar/hijri.js";
-
 export type Vec3 = [number, number, number];
 export type Algo = (time: Date) => Vec3;
-export type DateParams =
-  | [date: Date]
-  | [julianDate: JulianCalendar]
-  | [hijriDate: Hijri]
+
+export type TimeOptions = {
+  timezone?: number;
+  calendar?: CalendarSystem;
+};
+export type TimeArgs =
   | [year: number]
-  | [year: number, month: number]
-  | [year: number, month: number, day: number]
-  | [year: number, month: number, day: number, hour: number]
-  | [year: number, month: number, day: number, hour: number, minute: number]
+  | [date: Date]
+  | [year: number, month: number, options?: TimeOptions]
+  | [year: number, month: number, day: number, options?: TimeOptions]
+  | [
+      year: number,
+      month: number,
+      day: number,
+      hour: number,
+      options?: TimeOptions
+    ]
   | [
       year: number,
       month: number,
       day: number,
       hour: number,
       minute: number,
-      second: number
+      options?: TimeOptions
     ]
   | [
       year: number,
@@ -27,5 +32,15 @@ export type DateParams =
       hour: number,
       minute: number,
       second: number,
-      ms: number
+      options?: TimeOptions
     ];
+
+export type TimeZone =
+  | { type: "offset"; offset: number }
+  | { type: "name"; name: string };
+
+export enum CalendarSystem {
+  Gregorian = "GREGORIAN",
+  Julian = "JULIAN",
+  Hijri = "HIJRI",
+}

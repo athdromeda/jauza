@@ -1,84 +1,4 @@
 import { decToHms } from "../math/unit.js";
-import { JulianCalendar } from "../modules/calendar/julian.js";
-import { type DateParams } from "../types.js";
-
-export function resolveDate(...params: DateParams): {
-  date: Date | JulianCalendar;
-  calendar: "gregorian" | "julian";
-} {
-  const [
-    dateOrYear,
-    month = 1,
-    day = 1,
-    hour = 0,
-    minute = 0,
-    second = 0,
-    ms = 0,
-  ] = params;
-  if (dateOrYear instanceof Date) {
-    return { date: dateOrYear, calendar: "gregorian" };
-  }
-
-  if (dateOrYear instanceof JulianCalendar) {
-    return { date: dateOrYear, calendar: "julian" };
-  }
-
-  if (typeof dateOrYear === "number") {
-    const date = new Date(
-      dateOrYear,
-      (month as number) - 1,
-      day as number,
-      hour as number,
-      minute as number,
-      second as number,
-      ms as number
-    );
-    return { date, calendar: "gregorian" };
-  }
-
-  throw new Error("Invalid date parameters");
-}
-
-export function getJD(...params: DateParams) {
-  const { date, calendar } = resolveDate(...params);
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth() + 1;
-  const day = date.getUTCDate();
-  const hour = date.getUTCHours();
-  const minute = date.getUTCMinutes();
-  const second = date.getUTCSeconds();
-  const millisecond = date.getMilliseconds();
-
-  const M = month >= 3 ? month : month + 12;
-  const Y = month >= 3 ? year : year - 1;
-
-  const A = Math.floor(Y / 100);
-  const B = calendar === "julian" ? 0 : 2 - A + Math.floor(A / 4);
-
-  const JD =
-    1720994.5 +
-    Math.floor(365.25 * Y) +
-    Math.floor(30.6001 * (M + 1)) +
-    B +
-    day +
-    (hour + minute / 60 + second / 3600 + millisecond / 3600000) / 24;
-
-  console.table({
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    second,
-    millisecond,
-    M,
-    Y,
-    A,
-    B,
-    JD,
-  });
-  return JD;
-}
 
 export function jdToDate(jd: number) {
   const jd1 = jd + 0.5;
@@ -102,7 +22,6 @@ export function jdToDate(jd: number) {
   const hour = hmsInDecimal.hours;
   const minute = hmsInDecimal.minutes;
   const second = hmsInDecimal.seconds;
-  const ms = hmsInDecimal.ms;
   return {
     year,
     month,
@@ -110,6 +29,138 @@ export function jdToDate(jd: number) {
     hour: Math.floor(hour),
     minute,
     second,
-    ms,
   };
+}
+
+export function getDeltaT(year: number, month: number = 1) {
+  // https://eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html
+  const y = year + (month - 0.5) / 12;
+
+  if (y < -500) {
+    const u = (y - 1820) / 100;
+    return -20 + 32 * u * u;
+  }
+
+  if (y >= -500 && y <= 500) {
+    const u = y / 100;
+    return (
+      10583.6 -
+      1014.41 * u +
+      33.78311 * u * u -
+      5.952053 * u ** 3 -
+      0.1798452 * u ** 4 +
+      0.022174192 * u ** 5 +
+      0.0090316521 * u ** 6
+    );
+  }
+
+  if (y >= 500 && y <= 1600) {
+    const u = (y - 1000) / 100;
+    return (
+      1574.2 -
+      556.01 * u +
+      71.23472 * u * u +
+      0.319781 * u ** 3 -
+      0.8503463 * u ** 4 -
+      0.005050998 * u ** 5 +
+      0.0083572073 * u ** 6
+    );
+  }
+
+  if (y >= 1600 && y <= 1700) {
+    const t = y - 1600;
+    return 120 - 0.9808 * t - 0.01532 * t * t + t ** 3 / 7129;
+  }
+
+  if (y >= 1700 && y <= 1800) {
+    const t = y - 1700;
+    return (
+      8.83 +
+      0.1603 * t -
+      0.0059285 * t * t +
+      0.00013336 * t ** 3 -
+      t ** 4 / 1174000
+    );
+  }
+
+  if (y >= 1800 && y <= 1860) {
+    const t = y - 1800;
+    return (
+      13.72 -
+      0.332447 * t +
+      0.0068612 * t * t +
+      0.0041116 * t ** 3 -
+      0.00037436 * t ** 4 +
+      0.0000121272 * t ** 5 -
+      0.0000001699 * t ** 6 +
+      0.000000000875 * t ** 7
+    );
+  }
+
+  if (y >= 1860 && y <= 1900) {
+    const t = y - 1860;
+    return (
+      7.62 +
+      0.5737 * t -
+      0.251754 * t * t +
+      0.01680668 * t ** 3 -
+      0.0004473624 * t ** 4 +
+      t ** 5 / 233174
+    );
+  }
+
+  if (y >= 1900 && y <= 1920) {
+    const t = y - 1900;
+    return (
+      -2.79 +
+      1.494119 * t -
+      0.0598939 * t * t +
+      0.0061966 * t ** 3 -
+      0.000197 * t ** 4
+    );
+  }
+
+  if (y >= 1920 && y <= 1941) {
+    const t = y - 1920;
+    return 21.2 + 0.84493 * t - 0.0761 * t * t + 0.0020936 * t ** 3;
+  }
+
+  if (y >= 1941 && y <= 1961) {
+    const t = y - 1950;
+    return 29.07 + 0.407 * t - (t * t) / 233 + t ** 3 / 2547;
+  }
+
+  if (y >= 1961 && y <= 1986) {
+    const t = y - 1975;
+    return 45.45 + 1.067 * t - (t * t) / 260 - t ** 3 / 718;
+  }
+
+  if (y >= 1986 && y <= 2005) {
+    const t = y - 2000;
+    return (
+      63.86 +
+      0.3345 * t -
+      0.060374 * t * t +
+      0.0017275 * t ** 3 +
+      0.000651814 * t ** 4 +
+      0.00002373599 * t ** 5
+    );
+  }
+
+  if (y >= 2005 && y <= 2050) {
+    const t = y - 2000;
+    return 62.92 + 0.32217 * t + 0.005589 * t * t;
+  }
+
+  if (y >= 2050 && y <= 2150) {
+    const t = y - 1820;
+    return -20 + 32 * (t / 100) ** 2 - 0.5628 * (2150 - y);
+  }
+
+  if (y > 2150) {
+    const u = (y - 1820) / 100;
+    return -20 + 32 * u * u;
+  }
+
+  throw new Error("Invalid year");
 }

@@ -7,30 +7,21 @@ export class HijriCalendar extends Time {
   toJD() {
     const isNegativeYear = this.year < 0;
     const completedYear = isNegativeYear ? this.year * -1 + 1 : this.year - 1;
+    const completedMonth = this.month - 1;
     const completedCycles = Math.floor(completedYear / 30);
     const remainder = completedYear % 30;
 
     const daysInCompletedCycles = completedCycles * 10631;
     const daysInRemainder = getAcculumatedDaysInRemainderYear(remainder);
-    const daysInMonth = getAcculumatedDaysInMonth(this.month);
+    const daysInMonth = getAcculumatedDaysInMonth(completedMonth);
 
-    console.table({
-      year: this.year,
-      month: this.month,
-      day: this.day,
-      completedCycles,
-      remainder,
-      daysInCompletedCycles,
-      daysInRemainder,
-      daysInMonth,
-      date: this.day,
-    });
-
-    return (
-      HIJRI_EPOCH +
-      (daysInCompletedCycles + daysInRemainder + daysInMonth + this.day) *
-        (isNegativeYear ? -1 : 1)
-    );
+    return isNegativeYear
+      ? HIJRI_EPOCH -
+          (daysInCompletedCycles + daysInRemainder) +
+          (daysInMonth + this.day)
+      : HIJRI_EPOCH +
+          (daysInCompletedCycles + daysInRemainder) +
+          (daysInMonth + this.day);
   }
 
   get jd() {
@@ -47,5 +38,5 @@ export function getAcculumatedDaysInRemainderYear(remainderYear: number) {
 }
 
 export function getAcculumatedDaysInMonth(month: number) {
-  return month * 29 + Math.floor(month / 2);
+  return month * 29 + Math.ceil(month / 2);
 }

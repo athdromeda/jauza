@@ -16,14 +16,5 @@ export function getQibla(lat: number, lng: number, options?: QiblaOptions) {
   const denominator = cos(lat) * tan(KAABA_LAT) - sin(lat) * cos(deltaLng);
   const value = normalizeAngle(atan2(numerator, denominator));
 
-  console.table({
-    lat,
-    lng,
-    deltaLng,
-    numerator,
-    denominator,
-    value,
-  });
-
   return value;
 }

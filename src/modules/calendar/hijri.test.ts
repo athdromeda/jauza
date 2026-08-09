@@ -4,7 +4,7 @@ import { HijriCalendar } from "./hijri.js";
 
 describe("Hijri Convertions", () => {
   it("should convert 17 Ramadan 615 H to JD 2166272.5", () => {
-    const date = new HijriCalendar(615, 8, 17);
+    const date = new HijriCalendar(615, 9, 17);
     const jd = date.jd;
     expect(jd).toBe(2166272.5);
   });

@@ -15,3 +15,10 @@ export const decToHms = (dec: number) => {
   const seconds = ((dec % 1) * 60 - minutes) * 60;
   return { hours, minutes, seconds };
 };
+
+export const normalizeAngle = (angle: number) => {
+  if (angle < 0) {
+    return angle + 360;
+  }
+  return angle % 360;
+};

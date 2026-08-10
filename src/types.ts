@@ -44,3 +44,8 @@ export enum CalendarSystem {
   Julian = "JULIAN",
   Hijri = "HIJRI",
 }
+
+export interface TimeFormatOptions {
+  locale?: string;
+  options?: Intl.DateTimeFormatOptions;
+}

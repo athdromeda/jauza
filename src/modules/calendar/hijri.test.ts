@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { jdToDate } from "../../utils/time.js";
 import { HijriCalendar } from "./hijri.js";
+import { GregorianCalendar } from "./gregorian.js";
 
 describe("Hijri Convertions", () => {
   it("should convert 17 Ramadan 615 H to JD 2166272.5", () => {
@@ -11,10 +11,21 @@ describe("Hijri Convertions", () => {
 
   it("should convert 1 Muharram -1000 H to 14 Mei -349", () => {
     const date = new HijriCalendar(-1000, 1, 1);
-    const jd = date.jd;
-    console.log("JD:", jd);
-    const gregorianDate = jdToDate(jd);
-    expect(gregorianDate).toEqual({
+
+    const gregorianDate = new GregorianCalendar(date.jd);
+    expect(gregorianDate.info).toMatchObject({
+      year: -349,
+      month: 5,
+      day: 14,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    });
+  });
+
+  it("should convert 1 Muharram -1000 H to 14 Mei -349", () => {
+    const date = new HijriCalendar(-1000, 1, 1);
+    expect(date.toGregorian().info).toMatchObject({
       year: -349,
       month: 5,
       day: 14,
@@ -51,18 +62,36 @@ describe("Hijri Convertions", () => {
   ];
 
   testCases.forEach((testCase) => {
+    const hijriDate = new HijriCalendar(
+      testCase.hijri.year,
+      testCase.hijri.month,
+      testCase.hijri.day
+    );
+    const gregorianDate = new GregorianCalendar(hijriDate.jd);
     it(`should convert ${testCase.hijri.year} ${testCase.hijri.month} ${testCase.hijri.day} H to ${testCase.gregorian.year} ${testCase.gregorian.month} ${testCase.gregorian.day}`, () => {
-      const date = new HijriCalendar(
-        testCase.hijri.year,
-        testCase.hijri.month,
-        testCase.hijri.day
-      );
-      const jd = date.jd;
-      const gregorianDate = jdToDate(jd);
-      expect(gregorianDate).toEqual({
+      expect(gregorianDate.info).toMatchObject({
         year: testCase.gregorian.year,
         month: testCase.gregorian.month,
         day: testCase.gregorian.day,
+        hour: 0,
+        minute: 0,
+        second: 0,
+      });
+    });
+  });
+
+  testCases.forEach((testCase) => {
+    it(`should convert ${testCase.gregorian.year} ${testCase.gregorian.month} ${testCase.gregorian.day} G to ${testCase.hijri.year} ${testCase.hijri.month} ${testCase.hijri.day} H`, () => {
+      const gregorianDate = new GregorianCalendar(
+        testCase.gregorian.year,
+        testCase.gregorian.month,
+        testCase.gregorian.day
+      );
+      const hijriDate = new HijriCalendar(gregorianDate.jd);
+      expect(hijriDate.info).toMatchObject({
+        year: testCase.hijri.year,
+        month: testCase.hijri.month,
+        day: testCase.hijri.day,
         hour: 0,
         minute: 0,
         second: 0,

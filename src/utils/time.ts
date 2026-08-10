@@ -1,37 +1,3 @@
-import { decToHms } from "../math/unit.js";
-
-export function jdToDate(jd: number) {
-  const jd1 = jd + 0.5;
-  const Z = Math.floor(jd1);
-  const F = jd1 - Z;
-  const A =
-    Z < 2299161
-      ? Z
-      : Z +
-        1 +
-        Math.floor((Z - 1867216.25) / 36524.25) -
-        Math.floor(Math.floor((Z - 1867216.25) / 36524.25) / 4);
-  const B = A + 1524;
-  const C = Math.floor((B - 122.1) / 365.25);
-  const D = Math.floor(365.25 * C);
-  const E = Math.floor((B - D) / 30.6001);
-  const day = B - D - Math.floor(30.6001 * E) + F;
-  const month = E < 14 ? E - 1 : E - 13;
-  const year = month > 2 ? C - 4716 : C - 4715;
-  const hmsInDecimal = decToHms((day - Math.floor(day)) * 24);
-  const hour = hmsInDecimal.hours;
-  const minute = hmsInDecimal.minutes;
-  const second = hmsInDecimal.seconds;
-  return {
-    year,
-    month,
-    day: Math.floor(day),
-    hour: Math.floor(hour),
-    minute,
-    second,
-  };
-}
-
 export function getDeltaT(year: number, month: number = 1) {
   // https://eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html
   const y = year + (month - 0.5) / 12;

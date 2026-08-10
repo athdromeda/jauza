@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { jdToDate } from "./time.js";
 import { Time } from "../modules/time.js";
 import { JulianCalendar } from "../modules/calendar/julian.js";
+import { GregorianCalendar } from "../modules/calendar/gregorian.js";
 
 describe("getJD", () => {
   it("should return 2431684.5 for 17 Agustus 1945", () => {
@@ -32,8 +32,8 @@ describe("getJD", () => {
 
   it("should return  29 Februari 2016 pukul 10:48:43.2 for JD 2457447.9505", () => {
     const jd = 2457447.9505;
-    const date = jdToDate(jd);
-    expect(date).toEqual({
+    const date = new GregorianCalendar(jd).info;
+    expect(date).toMatchObject({
       year: 2016,
       month: 2,
       day: 29,

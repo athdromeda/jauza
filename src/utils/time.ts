@@ -128,5 +128,5 @@ export function getDeltaT(year: number, month: number = 1) {
     return -20 + 32 * u * u;
   }
 
-  throw new Error("Invalid year");
+  throw new Error(`${y} is an invalid year`);
 }

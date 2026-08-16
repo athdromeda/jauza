@@ -1,4 +1,4 @@
-import { decToHms } from "../math/unit.js";
+import { decToHms, normalizeHour } from "../math/unit.js";
 import {
   CalendarSystem,
   type TimeFormatOptions,
@@ -59,7 +59,7 @@ export class Time {
         (arguments.length === 2 && typeof month === "object")
       ) {
         const { year, month, day, hour, minute, second } =
-          this.fromJD(jdOrDate); // TODO: handle this for Hijri
+          this.fromJD(jdOrDate);
         this.#year = year;
         this.#month = month;
         this.#day = day;
@@ -72,12 +72,26 @@ export class Time {
       }
 
       this.#year = jdOrDate;
-      this.#month = (month as number) || 1;
-      this.#day = (dayOrOptions as number) || 1;
-      this.#hour = (hour as number) || 0;
-      this.#minute = (minute as number) || 0;
-      this.#second = (second as number) || 0;
-      this.#timezone = (options as TimeOptions)?.timezone || 0;
+
+      const numerics: number[] = [];
+      let opts: TimeOptions | undefined = options;
+
+      [month, dayOrOptions, hour, minute, second]
+        .filter((v) => v !== undefined)
+        .forEach((v) => {
+          if (typeof v === "number") {
+            numerics.push(v);
+          } else {
+            opts = v as TimeOptions;
+          }
+        });
+
+      this.#month = numerics[0] || 1;
+      this.#day = numerics[1] || 1;
+      this.#hour = numerics[2] || 0;
+      this.#minute = numerics[3] || 0;
+      this.#second = numerics[4] || 0;
+      this.#timezone = opts?.timezone || 0;
       this.#calendar = this.resolveCalendar(options);
     } else {
       this.#year = jdOrDate.getUTCFullYear();
@@ -197,7 +211,7 @@ export class Time {
     const gst = 6.6973745583 + 2400.0513369072 * T + 0.0000258622 * T * T;
     const timeFraction =
       this.#hour + this.#minute / 60 + this.#second / 3600 - this.#timezone; // TODO: need to test handle timezone
-    return gst + timeFraction;
+    return normalizeHour(gst + timeFraction);
   }
 
   get gst() {
@@ -219,5 +233,9 @@ export class Time {
     return `${this.#day} ${month} ${this.#year} ${this.#hour}:${this.#minute}:${
       this.#second
     }`;
+  }
+
+  static now() {
+    return new Time(new Date());
   }
 }

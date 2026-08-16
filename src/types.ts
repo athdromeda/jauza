@@ -1,3 +1,5 @@
+import type { DMS } from "./modules/angle.js";
+
 export type Vec3 = [number, number, number];
 export type Algo = (time: Date) => Vec3;
 
@@ -48,4 +50,52 @@ export enum CalendarSystem {
 export interface TimeFormatOptions {
   locale?: string;
   options?: Intl.DateTimeFormatOptions;
+}
+
+export type AlgoConfig = {
+  name: string;
+  bodies: BodyType[];
+} & Partial<Record<BodyType, BodyConfig>>;
+
+export type BodyType = "SUN" | "MOON" | "EARTH" | "BODY";
+
+export type BodyConfig = {
+  outputType: OutputType;
+  formula: (input: AlgoInput) => AlgoOutput;
+};
+
+export type OutputType = "ECLIPTIC" | "EQUATORIAL";
+
+export type AlgoInput = {
+  jd: number;
+};
+
+export type AlgoOutput = GeocentricEcliptic | HeliocentricEcliptic; //to be added more later
+
+export type GeocentricEcliptic = {
+  lambda: number;
+  beta: number;
+  r: number;
+};
+
+export type HeliocentricEcliptic = {
+  l: number;
+  b: number;
+  r: number;
+};
+
+export interface EquatorialValues {
+  ra: DMS;
+  dec: DMS;
+}
+
+export interface EclipticValues {
+  l: DMS;
+  b: DMS;
+  r: number;
+}
+
+export interface HorizontalValues {
+  az: DMS;
+  alt: DMS;
 }

@@ -22,3 +22,10 @@ export const normalizeAngle = (angle: number) => {
   }
   return angle % 360;
 };
+
+export const normalizeHour = (hour: number) => {
+  if (hour < 0) {
+    return hour + 24;
+  }
+  return hour % 24;
+};

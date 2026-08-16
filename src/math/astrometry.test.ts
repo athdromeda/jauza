@@ -14,7 +14,7 @@ describe("astrometry", () => {
 
   it("should convert equatorial to ecliptic", () => {
     const equatorial = {
-      ra: new HMS(2, 12, 17.5).dms,
+      ra: new HMS(2, 12, 17.5).toDMS(),
       dec: new DMS(13, 18, 40.3),
     };
     const epsilon = 23.439607;

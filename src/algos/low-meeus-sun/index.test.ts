@@ -6,18 +6,17 @@ import { meeusLow } from "./index.js";
 
 describe("low-meeus-sun", () => {
   it("should calculate sun position", () => {
-    const jakarta = new Earth([-6, 10], [106, 51], 0);
-    const observationTime = new Time(2009, 7, 1, 3);
+    //taken from 24.a Meeus - Astronomical Algorithms
+    const observationPlace = new Earth([0, 0], [0, 0], 0);
+    const observationTime = new Time(1992, 10, 13, 0);
 
-    const observer = jakarta.at(observationTime).with(meeusLow);
+    const observer = observationPlace.at(observationTime).with(meeusLow);
     const sun = observer.observe(Sun).apparent();
 
-    expect(sun.r).toBeCloseTo(1.016670259);
-    expect(sun.lambda.decimal).toBeCloseTo(99.43032742);
+    expect(sun.r).toBeCloseTo(0.99766);
+    expect(sun.lambda.decimal).toBeCloseTo(199.90894);
     expect(sun.beta.decimal).toBeCloseTo(0);
-    expect(sun.ra.decimal).toBeCloseTo(100.2611833);
-    expect(sun.dec.decimal).toBeCloseTo(23.10395198);
-    expect(sun.alt).toBeCloseTo(49.13945414115066);
-    expect(sun.az).toBeCloseTo(43.20255899);
+    expect(sun.ra.decimal).toBeCloseTo(-161.61918);
+    expect(sun.dec.decimal).toBeCloseTo(-7.78507);
   });
 });

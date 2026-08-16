@@ -3,8 +3,10 @@ import {
   eclipticToXyz,
   xyzToEcliptic,
 } from "../math/astrometry.js";
+import { normalizeAngle } from "../math/unit.js";
 import {
   type AlgoConfig,
+  type ApparentCorrection,
   type BodyType,
   type HeliocentricEcliptic,
 } from "../types.js";
@@ -19,6 +21,9 @@ export abstract class Body {
   sourceVec: Vec3 = new Vec3(0, 0, 0);
   targetVec: Vec3 = new Vec3(0, 0, 0);
   algo: AlgoConfig | null = null;
+  epsilon: number = 23.5;
+  appearance: "geometric" | "apparent" = "geometric";
+  corrections: ApparentCorrection | null = null;
 
   constructor(time: Time) {
     this.time = time;
@@ -41,15 +46,23 @@ export abstract class Body {
     this.algo = algo;
     if (this.algo[this.type]) {
       if (this.algo[this.type]!.outputType === "ECLIPTIC") {
-        const { l, b, r } = this.algo[this.type]!.formula({
+        const helioEcliptic = this.algo[this.type]!.formula({
           jd: this.time.jd,
         }) as HeliocentricEcliptic;
+        const { l, b, r, epsilon } = helioEcliptic;
+        this.epsilon = epsilon ?? this.epsilon;
+        this.corrections = helioEcliptic.corrections ?? null;
         this.sourceVec = new Representation(
           new Vec3(l, b, r),
           "spherical"
         ).toCartesian().vec3;
       }
     }
+    return this;
+  }
+
+  apparent() {
+    this.appearance = "apparent";
     return this;
   }
 
@@ -61,6 +74,7 @@ export abstract class Body {
       sourceVec: this.sourceVec,
       targetVec: this.targetVec,
       algo: this.algo?.name ?? null,
+      appearance: this.appearance,
     };
   }
 
@@ -80,22 +94,37 @@ export abstract class Body {
   }
 
   get lambda() {
+    if (this.appearance === "apparent") {
+      const aberrationLon = this.corrections?.aberration?.lon ?? 0;
+      const nutationLon = this.corrections?.nutation?.lon ?? 0;
+      return new DMS(
+        normalizeAngle(this.ecliptic.l.decimal + aberrationLon + nutationLon)
+      );
+    }
     return this.ecliptic.l;
   }
 
   get beta() {
+    if (this.appearance === "apparent") {
+      const aberrationLat = this.corrections?.aberration?.lat ?? 0;
+      return new DMS(normalizeAngle(this.ecliptic.b.decimal + aberrationLat));
+    }
     return this.ecliptic.b;
+  }
+
+  get r() {
+    return this.ecliptic.r;
   }
 
   get ra() {
     const ecliptic = this.ecliptic;
-    const equatorial = eclipticToEquatorial(ecliptic);
+    const equatorial = eclipticToEquatorial(ecliptic, this.epsilon);
     return equatorial.ra;
   }
 
   get dec() {
     const ecliptic = this.ecliptic;
-    const equatorial = eclipticToEquatorial(ecliptic);
+    const equatorial = eclipticToEquatorial(ecliptic, this.epsilon);
     return equatorial.dec;
   }
 }

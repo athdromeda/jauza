@@ -10,16 +10,11 @@ export class Vec3 {
   }
 
   add(other: Vec3): Vec3 {
-    this.x += other.x;
-    this.y += other.y;
-    this.z += other.z;
-    return this;
+    return new Vec3(this.x + other.x, this.y + other.y, this.z + other.z);
   }
 
   sub(other: Vec3): Vec3 {
-    this.x -= other.x;
-    this.y -= other.y;
-    this.z -= other.z;
-    return this;
+    return new Vec3(this.x - other.x, this.y - other.y, this.z - other.z);
   }
 }
+

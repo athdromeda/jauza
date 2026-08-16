@@ -10,14 +10,14 @@ describe("low-meeus-sun", () => {
     const observationTime = new Time(2009, 7, 1, 3);
 
     const observer = jakarta.at(observationTime).with(meeusLow);
-    const sun = observer.observe(Sun);
-    console.log("sun", sun.info);
-    console.log("lambda", sun.lambda.decimal);
-    console.log("beta", sun.beta.decimal);
-    console.log("ra", sun.ra.decimal);
-    console.log("dec", sun.dec.decimal);
-    console.log("alt", sun.alt);
-    console.log("az", sun.az);
-    expect(sun.info).toBeDefined();
+    const sun = observer.observe(Sun).apparent();
+
+    expect(sun.r).toBeCloseTo(1.016670259);
+    expect(sun.lambda.decimal).toBeCloseTo(99.43032742);
+    expect(sun.beta.decimal).toBeCloseTo(0);
+    expect(sun.ra.decimal).toBeCloseTo(100.2611833);
+    expect(sun.dec.decimal).toBeCloseTo(23.10395198);
+    expect(sun.alt).toBeCloseTo(49.13945414115066);
+    expect(sun.az).toBeCloseTo(43.20255899);
   });
 });

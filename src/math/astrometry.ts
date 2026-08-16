@@ -4,7 +4,7 @@ import type {
   EquatorialValues,
   HorizontalValues,
 } from "../types.js";
-import { asin, atan, atan2, cos, sin, tan } from "./trigonometry.js";
+import { acos, asin, atan, atan2, cos, sin, tan } from "./trigonometry.js";
 import { normalizeAngle } from "./unit.js";
 
 export const getAngleBetweenVectors = (
@@ -14,23 +14,22 @@ export const getAngleBetweenVectors = (
   const dot = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
   const mag1 = Math.sqrt(v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]);
   const mag2 = Math.sqrt(v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]);
-  return Math.acos(dot / (mag1 * mag2));
+  return acos(dot / (mag1 * mag2));
 };
 
 export const eclipticToXyz = (
   ecliptic: [number, number, number]
 ): [number, number, number] => {
   const [l, b, r] = ecliptic;
-  const x = r * Math.cos(b) * Math.cos(l);
-  const y = r * Math.cos(b) * Math.sin(l);
-  const z = r * Math.sin(b);
+  const x = r * cos(b) * cos(l);
+  const y = r * cos(b) * sin(l);
+  const z = r * sin(b);
   return [x, y, z];
 };
 
 export const xyzToEcliptic = (
   xyz: [number, number, number]
 ): EclipticValues => {
-  console.log("xyz", xyz);
   const [x, y, z] = xyz;
   const r = Math.sqrt(x * x + y * y + z * z);
   const l = atan2(y, x);

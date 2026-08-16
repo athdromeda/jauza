@@ -72,16 +72,30 @@ export type AlgoInput = {
 
 export type AlgoOutput = GeocentricEcliptic | HeliocentricEcliptic; //to be added more later
 
+export type ApparentCorrection = {
+  aberration?: {
+    lon: number;
+    lat: number;
+  };
+  nutation?: {
+    lon: number;
+    obl: number;
+  };
+};
+
 export type GeocentricEcliptic = {
   lambda: number;
   beta: number;
   r: number;
+  epsilon?: number;
 };
 
 export type HeliocentricEcliptic = {
   l: number;
   b: number;
   r: number;
+  epsilon?: number;
+  corrections?: ApparentCorrection;
 };
 
 export interface EquatorialValues {

@@ -1,10 +1,10 @@
 import { cos, sin } from "../../math/trigonometry.js";
 import { normalizeAngle } from "../../math/unit.js";
 import { Time } from "../../modules/time.js";
-import type { AlgoConfig } from "../../types.js";
+import type { AlgoConfig, HeliocentricEcliptic } from "../../types.js";
 import { getDeltaT } from "../../utils/time.js";
 
-function earth(input: { jd: number }) {
+function earth(input: { jd: number }): HeliocentricEcliptic {
   const { jd } = input;
   const year = new Time(jd).year;
   const jde = jd + getDeltaT(year) / 86400;
@@ -59,6 +59,16 @@ function earth(input: { jd: number }) {
     b,
     epsilon,
     r,
+    corrections: {
+      aberration: {
+        lon: -0.00569,
+        lat: 0,
+      },
+      nutation: {
+        lon: -0.00478 * sin(omega),
+        obl: 0,
+      },
+    },
   };
 }
 
@@ -66,7 +76,6 @@ function sun(input: { jd: number }) {
   return {
     l: 0,
     b: 0,
-    epsilon: 0,
     r: 0,
   };
 }

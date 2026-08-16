@@ -8,6 +8,6 @@ export class GregorianCalendar extends Time {
   }
 
   toHijri() {
-    return new HijriCalendar(this.toJD());
+    return new HijriCalendar(this.jd);
   }
 }

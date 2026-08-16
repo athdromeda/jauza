@@ -9,10 +9,17 @@ export const ACCUMULATED_DAYS_IN_CYCLE = Array.from({ length: 30 }, (_, i) =>
 export const DAYS_IN_CYCLE = 10631;
 
 export class HijriCalendar extends Time {
-  toJD() {
-    const isNegativeYear = this.year < 0;
-    const completedYear = isNegativeYear ? this.year * -1 + 1 : this.year - 1;
-    const completedMonth = this.month - 1;
+  protected civilToJDUt(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number
+  ): number {
+    const isNegativeYear = year < 0;
+    const completedYear = isNegativeYear ? year * -1 + 1 : year - 1;
+    const completedMonth = month - 1;
     const completedCycles = Math.floor(completedYear / 30);
     const remainder = completedYear % 30;
 
@@ -23,10 +30,10 @@ export class HijriCalendar extends Time {
     return isNegativeYear
       ? HIJRI_EPOCH -
           (daysInCompletedCycles + daysInRemainder) +
-          (daysInMonth + this.day)
+          (daysInMonth + day)
       : HIJRI_EPOCH +
           (daysInCompletedCycles + daysInRemainder) +
-          (daysInMonth + this.day);
+          (daysInMonth + day);
   }
 
   fromJD(jd: number) {
@@ -51,12 +58,8 @@ export class HijriCalendar extends Time {
     };
   }
 
-  get jd() {
-    return this.toJD();
-  }
-
   toGregorian() {
-    return new GregorianCalendar(this.toJD());
+    return new GregorianCalendar(this.jd);
   }
 }
 

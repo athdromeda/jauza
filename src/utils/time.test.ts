@@ -43,3 +43,35 @@ describe("getJD", () => {
     });
   });
 });
+
+describe("timezone", () => {
+  it("should convert local civil time with offset to the UT jd", () => {
+    const local = new Time(2024, 1, 1, 19, 0, 0, { timezone: 7 });
+    const ut = new Time(2024, 1, 1, 12, 0, 0);
+    expect(local.jd).toBe(ut.jd);
+  });
+
+  it("should display civil fields in the local time zone from a UT jd", () => {
+    const t = new Time(2460311, { timezone: 7 });
+    expect(t.jd).toBe(2460311);
+    expect(t.day).toBe(1);
+    expect(t.hour).toBe(19);
+  });
+
+  it("should roll the civil day over across the UT boundary", () => {
+    const t = new Time(2024, 1, 1, 0, 30, 0, { timezone: 7 });
+    expect(t.day).toBe(1);
+    expect(t.hour).toBe(0);
+    expect(t.minute).toBe(30);
+    expect(t.jd).toBeCloseTo(new Time(2023, 12, 31, 17, 30).jd, 6);
+  });
+
+  it("should treat a Date-constructed instant and a civil+offset instant identically", () => {
+    const fromDate = new Time(new Date("2024-01-01T12:00:00Z"), {
+      timezone: 7,
+    });
+    const fromCivil = new Time(2024, 1, 1, 19, 0, 0, { timezone: 7 });
+    expect(fromDate.jd).toBe(fromCivil.jd);
+    expect(fromDate.hour).toBe(19);
+  });
+});

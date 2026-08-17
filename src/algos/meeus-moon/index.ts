@@ -1,4 +1,5 @@
 import { cos, sin } from "../../math/trigonometry.js";
+import { normalizeAngle } from "../../math/unit.js";
 import { eclipticOfDate } from "../../modules/position.js";
 import { Time } from "../../modules/time.js";
 import type { AlgoConfig } from "../../types.js";
@@ -10,60 +11,83 @@ function moon(input: { jd: number }) {
   const jde = jd + getDeltaT(year) / 86400;
   const T = (jde - 2451545) / 36525;
 
-  const L_prime =
-    218.3164591 +
-    481267.88134236 * T -
-    0.0013268 * T ** 2 +
-    T ** 3 / 538841 -
-    T ** 4 / 65194000;
+  const L_prime = normalizeAngle(
+    218.3164477 +
+      481267.88123421 * T -
+      0.0015786 * T ** 2 +
+      T ** 3 / 538841 -
+      T ** 4 / 65194000
+  );
 
-  const D =
-    297.8502042 +
-    445267.1115168 * T -
-    0.00163 * T ** 2 +
-    T ** 3 / 545868 -
-    T ** 4 / 113065000;
+  const D = normalizeAngle(
+    297.8501921 +
+      445267.1114034 * T -
+      0.0018819 * T ** 2 +
+      T ** 3 / 545868 -
+      T ** 4 / 113065000
+  );
 
-  const M =
-    357.5291092 + 35999.0502909 * T - 0.0001536 * T ** 2 + T ** 3 / 24490000;
+  const M = normalizeAngle(
+    357.5291092 + 35999.0502909 * T - 0.0001536 * T ** 2 + T ** 3 / 24490000
+  );
 
-  const M_prime =
-    134.9634114 +
-    477198.8676313 * T +
-    0.008997 * T ** 2 +
-    T ** 3 / 69699 -
-    T ** 4 / 14712000;
+  const M_prime = normalizeAngle(
+    134.9633964 +
+      477198.8675055 * T +
+      0.0087414 * T ** 2 +
+      T ** 3 / 69699 -
+      T ** 4 / 14712000
+  );
 
-  const F =
-    93.2720993 +
-    483202.0175273 * T -
-    0.0034029 * T ** 2 -
-    T ** 3 / 3526000 +
-    T ** 4 / 863310000;
+  const F = normalizeAngle(
+    93.272095 +
+      483202.0175233 * T -
+      0.0036539 * T ** 2 -
+      T ** 3 / 3526000 +
+      T ** 4 / 863310000
+  );
 
-  const A1 = 119.75 + 131.849 * T;
-  const A2 = 53.09 + 479264.29 * T;
-  const A3 = 313.45 + 481266.484 * T;
+  const A1 = normalizeAngle(119.75 + 131.849 * T);
+  const A2 = normalizeAngle(53.09 + 479264.29 * T);
+  const A3 = normalizeAngle(313.45 + 481266.484 * T);
 
   const E = 1 - 0.002516 * T - 0.0000074 * T ** 2;
 
   const sum_l = LUNAR_LONGITUDE_DISTANCE_PERIODIC.reduce(
     (acc, [d, m, m_prime, f, l_coeff, _r_coeff]) => {
-      return acc + l_coeff * sin(d * D + m * M + m_prime * M_prime + f * F);
+      const eccentricityEffect = m === 0 ? 1 : Math.abs(m) === 1 ? E : E * E;
+      return (
+        acc +
+        l_coeff *
+          sin(d * D + m * M + m_prime * M_prime + f * F) *
+          eccentricityEffect
+      );
     },
     0
   );
 
   const sum_r = LUNAR_LONGITUDE_DISTANCE_PERIODIC.reduce(
     (acc, [d, m, m_prime, f, _l_coeff, r_coeff]) => {
-      return acc + r_coeff * cos(d * D + m * M + m_prime * M_prime + f * F);
+      const eccentricityEffect = m === 0 ? 1 : Math.abs(m) === 1 ? E : E * E;
+      return (
+        acc +
+        r_coeff *
+          cos(d * D + m * M + m_prime * M_prime + f * F) *
+          eccentricityEffect
+      );
     },
     0
   );
 
   const sum_b = LUNAR_LATITUDE_PERIODIC.reduce(
     (acc, [d, m, m_prime, f, b_coeff]) => {
-      return acc + b_coeff * sin(d * D + m * M + m_prime * M_prime + f * F);
+      const eccentricityEffect = m === 0 ? 1 : Math.abs(m) === 1 ? E : E * E;
+      return (
+        acc +
+        b_coeff *
+          sin(d * D + m * M + m_prime * M_prime + f * F) *
+          eccentricityEffect
+      );
     },
     0
   );
@@ -72,21 +96,39 @@ function moon(input: { jd: number }) {
     3958 * sin(A1) + 1962 * sin(L_prime - F) + 318 * sin(A2);
 
   const sum_b_correction =
-    2235 * sin(L_prime) +
+    -2235 * sin(L_prime) +
     382 * sin(A3) +
     175 * sin(A1 - F) +
     175 * sin(A1 + F) +
-    127 * sin(L_prime - M_prime) +
+    127 * sin(L_prime - M_prime) -
     115 * sin(L_prime + M_prime);
 
   const corrected_sum_l = sum_l + sum_l_correction;
   const corrected_sum_b = sum_b + sum_b_correction;
 
-  // geocentric
-
   const lambda = L_prime + corrected_sum_l / 1000000;
   const beta = corrected_sum_b / 1000000;
   const delta = 385000.56 + sum_r / 1000;
+
+  console.table({
+    jde,
+    T,
+    L_prime,
+    D,
+    M,
+    M_prime,
+    F,
+    A1,
+    A2,
+    A3,
+    E,
+    corrected_sum_b,
+    corrected_sum_l,
+    sum_r,
+    lambda,
+    beta,
+    delta,
+  });
 
   return {
     l: lambda,
@@ -108,7 +150,7 @@ const LUNAR_LONGITUDE_DISTANCE_PERIODIC: [
   [2, 0, -1, 0, 1274027, -3699111],
   [2, 0, 0, 0, 658314, -2955968],
   [0, 0, 2, 0, 213618, -569925],
-  [0, 1, 0, 0, -185116, 48808],
+  [0, 1, 0, 0, -185116, 48888],
   [0, 0, 0, 2, -114332, -3149],
   [2, 0, -2, 0, 58793, 246158],
   [2, -1, -1, 0, 57066, -152138],
@@ -120,7 +162,7 @@ const LUNAR_LONGITUDE_DISTANCE_PERIODIC: [
   [2, 0, 0, -2, 15327, 10321],
   [0, 0, 1, 2, -12528, 0],
   [0, 0, 1, -2, 10980, 79661],
-  [4, 0, -1, -2, 10675, -34782],
+  [4, 0, -1, 0, 10675, -34782],
   [0, 0, 3, 0, 10034, -23210],
   [4, 0, -2, 0, 8548, -21636],
   [2, 1, -1, 0, -7888, 24208],
@@ -141,9 +183,9 @@ const LUNAR_LONGITUDE_DISTANCE_PERIODIC: [
   [2, -2, -1, 0, 2048, -4950],
   [2, 0, 1, -2, -1773, 4130],
   [2, 0, 0, 2, -1595, 0],
-  [4, -1, -1, 0, 1215, 0],
+  [4, -1, -1, 0, 1215, -3958],
   [0, 0, 2, 2, -1110, 0],
-  [3, 0, -1, 0, -892, -3258],
+  [3, 0, -1, 0, -892, 3258],
   [2, 1, 1, 0, -810, 2616],
   [4, -1, -2, 0, 759, -1897],
   [0, 2, -1, 0, -713, -2117],
@@ -230,7 +272,7 @@ const LUNAR_LATITUDE_PERIODIC: [number, number, number, number, number][] = [
   [2, -2, 0, 1, 107],
 ];
 
-export const meeusLow: AlgoConfig = {
+export const meeusMoon: AlgoConfig = {
   name: "MeeusLow",
   bodies: ["MOON"],
   MOON: {

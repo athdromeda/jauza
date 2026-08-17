@@ -11,7 +11,13 @@ import { DMS } from "./angle.js";
 import type { Origin, Position } from "./position.js";
 import { eclipticOfDate } from "./position.js";
 import type { OriginResolver } from "./transform.js";
-import { buildResolver, createResolver, relative, toPosition, toSpherical } from "./transform.js";
+import {
+  buildResolver,
+  createResolver,
+  relative,
+  toPosition,
+  toSpherical,
+} from "./transform.js";
 import type { Time } from "./time.js";
 import { Vec3 } from "./vec3.js";
 
@@ -103,7 +109,11 @@ export abstract class Body {
       const aberrationLon = this.corrections?.aberration?.lon ?? 0;
       const nutationLon = this.corrections?.nutation?.lon ?? 0;
       return new DMS(
-        normalizeAngle(this.ecliptic.l.decimal + aberrationLon + nutationLon)
+        normalizeAngle(
+          this.ecliptic.l.decimal + aberrationLon + nutationLon,
+          0,
+          360
+        )
       );
     }
     return this.ecliptic.l;
@@ -112,7 +122,9 @@ export abstract class Body {
   get beta() {
     if (this.appearance === "apparent") {
       const aberrationLat = this.corrections?.aberration?.lat ?? 0;
-      return new DMS(normalizeAngle(this.ecliptic.b.decimal + aberrationLat));
+      return new DMS(
+        normalizeAngle(this.ecliptic.b.decimal + aberrationLat, -90, 90)
+      );
     }
     return this.ecliptic.b;
   }

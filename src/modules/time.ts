@@ -5,6 +5,7 @@ import {
   type TimeFormatOptions,
   type TimeOptions,
 } from "../types.js";
+import { getDeltaT } from "../utils/time.js";
 
 export class Time {
   #jd: number;
@@ -228,6 +229,15 @@ export class Time {
 
   get gst() {
     return this.toGST();
+  }
+
+  asDT() {
+    const year = this.year;
+    const deltaT = getDeltaT(year) / 86400;
+    return new Time(this.#jd - deltaT, {
+      timezone: this.#timezone,
+      calendar: this.#calendar,
+    });
   }
 
   protected resolveCalendar(options?: TimeOptions): CalendarSystem {

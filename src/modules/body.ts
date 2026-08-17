@@ -1,39 +1,55 @@
-import {
-  eclipticToEquatorial,
-  eclipticToXyz,
-  xyzToEcliptic,
-} from "../math/astrometry.js";
+import { eclipticToEquatorial } from "../math/astrometry.js";
 import { normalizeAngle } from "../math/unit.js";
 import {
   type AlgoConfig,
   type ApparentCorrection,
   type BodyType,
   type HeliocentricEcliptic,
+  ORIGIN_FOR,
 } from "../types.js";
 import { DMS } from "./angle.js";
-import { Representation } from "./representation.js";
+import type { Origin, Position } from "./position.js";
+import { eclipticOfDate } from "./position.js";
+import type { OriginResolver } from "./transform.js";
+import { buildResolver, createResolver, relative, toPosition, toSpherical } from "./transform.js";
 import type { Time } from "./time.js";
 import { Vec3 } from "./vec3.js";
 
 export abstract class Body {
-  abstract readonly type: BodyType;
+  readonly type: BodyType;
   time: Time;
-  sourceVec: Vec3 = new Vec3(0, 0, 0);
-  targetVec: Vec3 = new Vec3(0, 0, 0);
+  source: Position;
+  target: Position;
+  resolver: OriginResolver;
   algo: AlgoConfig | null = null;
   epsilon: number = 23.5;
   appearance: "geometric" | "apparent" = "geometric";
   corrections: ApparentCorrection | null = null;
 
-  constructor(time: Time) {
+  constructor(time: Time, type: BodyType) {
+    this.type = type;
     this.time = time;
+    this.source = this.homePosition;
+    this.target = this.homePosition;
+    this.resolver = createResolver({});
+  }
+
+  get homeOrigin(): Origin {
+    return ORIGIN_FOR[this.type];
+  }
+
+  get homePosition(): Position {
+    return {
+      representation: { kind: "cartesian", vec3: new Vec3(0, 0, 0) },
+      origin: this.homeOrigin,
+      frame: eclipticOfDate,
+    };
   }
 
   observe(BodyClass: new (time: Time) => Body) {
     const target = new BodyClass(this.time);
-    console.log("target", target.sourceVec);
-    this.targetVec = target.sourceVec;
-
+    if (this.algo) target.with(this.algo);
+    this.target = target.source;
     return this;
   }
 
@@ -44,20 +60,14 @@ export abstract class Body {
 
   with(algo: AlgoConfig) {
     this.algo = algo;
-    if (this.algo[this.type]) {
-      if (this.algo[this.type]!.outputType === "ECLIPTIC") {
-        const helioEcliptic = this.algo[this.type]!.formula({
-          jd: this.time.jd,
-        }) as HeliocentricEcliptic;
-        const { l, b, r, epsilon } = helioEcliptic;
-        this.epsilon = epsilon ?? this.epsilon;
-        this.corrections = helioEcliptic.corrections ?? null;
-        this.sourceVec = new Representation(
-          new Vec3(l, b, r),
-          "spherical"
-        ).toCartesian().vec3;
-      }
+    const cfg = algo[this.type];
+    if (cfg) {
+      const raw = cfg.formula({ jd: this.time.jd }) as HeliocentricEcliptic;
+      this.source = toPosition(raw, cfg);
+      this.epsilon = raw.epsilon ?? this.epsilon;
+      this.corrections = raw.corrections ?? null;
     }
+    this.resolver = buildResolver(algo, this.time.jd);
     return this;
   }
 
@@ -71,25 +81,20 @@ export abstract class Body {
       type: this.type,
       time: this.time.format(),
       jd: this.time.jd,
-      sourceVec: this.sourceVec,
-      targetVec: this.targetVec,
+      origin: this.homeOrigin,
+      source: this.source,
+      target: this.target,
       algo: this.algo?.name ?? null,
       appearance: this.appearance,
     };
   }
 
   get ecliptic() {
-    const relativeVec = this.targetVec.sub(this.sourceVec);
-    // console.log("relativeVec", relativeVec);
-    const sphericalRepresentation = new Representation(
-      relativeVec,
-      "cartesian"
-    ).toSpherical();
-    // console.log("sphericalRepresentation", sphericalRepresentation.vec3);
+    const pos = toSpherical(relative(this.source, this.target, this.resolver));
     return {
-      l: new DMS(sphericalRepresentation.vec3.x),
-      b: new DMS(sphericalRepresentation.vec3.y),
-      r: sphericalRepresentation.vec3.z,
+      l: new DMS(pos.representation.lon),
+      b: new DMS(pos.representation.lat),
+      r: pos.representation.r,
     };
   }
 

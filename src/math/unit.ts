@@ -17,10 +17,8 @@ export const decToHms = (dec: number) => {
 };
 
 export const normalizeAngle = (angle: number) => {
-  if (angle < 0) {
-    return angle + 360;
-  }
-  return angle % 360;
+  const normalized = angle % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
 };
 
 export const normalizeHour = (hour: number) => {

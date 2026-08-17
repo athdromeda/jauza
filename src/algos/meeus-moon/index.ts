@@ -1,4 +1,5 @@
 import { cos, sin } from "../../math/trigonometry.js";
+import { eclipticOfDate } from "../../modules/position.js";
 import { Time } from "../../modules/time.js";
 import type { AlgoConfig } from "../../types.js";
 import { getDeltaT } from "../../utils/time.js";
@@ -234,6 +235,8 @@ export const meeusLow: AlgoConfig = {
   bodies: ["MOON"],
   MOON: {
     outputType: "ECLIPTIC",
+    origin: "earth",
+    frame: eclipticOfDate,
     formula: moon,
   },
 };

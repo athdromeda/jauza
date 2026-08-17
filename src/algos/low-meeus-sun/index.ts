@@ -1,5 +1,6 @@
 import { cos, sin } from "../../math/trigonometry.js";
 import { normalizeAngle } from "../../math/unit.js";
+import { eclipticOfDate } from "../../modules/position.js";
 import { Time } from "../../modules/time.js";
 import type { AlgoConfig, HeliocentricEcliptic } from "../../types.js";
 import { getDeltaT } from "../../utils/time.js";
@@ -85,10 +86,14 @@ export const meeusLow: AlgoConfig = {
   bodies: ["SUN", "EARTH"],
   EARTH: {
     outputType: "ECLIPTIC",
+    origin: "sun",
+    frame: eclipticOfDate,
     formula: earth,
   },
   SUN: {
     outputType: "ECLIPTIC",
+    origin: "sun",
+    frame: eclipticOfDate,
     formula: sun,
   },
 };

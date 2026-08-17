@@ -1,4 +1,5 @@
 import type { DMS } from "./modules/angle.js";
+import type { Frame, Origin } from "./modules/position.js";
 
 export type Vec3 = [number, number, number];
 export type Algo = (time: Date) => Vec3;
@@ -59,8 +60,17 @@ export type AlgoConfig = {
 
 export type BodyType = "SUN" | "MOON" | "EARTH" | "BODY";
 
+export const ORIGIN_FOR: Record<BodyType, Origin> = {
+  SUN: "sun",
+  MOON: "moon",
+  EARTH: "earth",
+  BODY: "barycenter",
+};
+
 export type BodyConfig = {
   outputType: OutputType;
+  origin: Origin;
+  frame: Frame;
   formula: (input: AlgoInput) => AlgoOutput;
 };
 

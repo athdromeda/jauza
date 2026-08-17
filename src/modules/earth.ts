@@ -11,7 +11,6 @@ import { Time } from "./time.js";
 type CoordinateArray = [number, number] | [number, number, number];
 
 export class Earth extends Body {
-  readonly type = "EARTH";
   lat: number;
   lng: number;
   h: number;
@@ -23,7 +22,7 @@ export class Earth extends Body {
     h?: number,
     time?: Time
   ) {
-    super(time ?? Time.now());
+    super(time ?? Time.now(), "EARTH");
 
     if (Array.isArray(lat)) {
       const isNegative = lat[0] < 0;

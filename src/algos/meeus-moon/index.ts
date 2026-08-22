@@ -106,29 +106,43 @@ function moon(input: { jd: number }) {
   const corrected_sum_l = sum_l + sum_l_correction;
   const corrected_sum_b = sum_b + sum_b_correction;
 
+  const omega =
+    125.0445479 -
+    1934.1362891 * T +
+    0.0020754 * T ** 2 +
+    T ** 3 / 467441 -
+    T ** 4 / 60616000;
+
+  const pi =
+    83.3532465 +
+    4069.0137287 * T -
+    0.01032 * T ** 2 +
+    T ** 3 / 80053 +
+    T ** 4 / 18999000;
+
   const lambda = L_prime + corrected_sum_l / 1000000;
   const beta = corrected_sum_b / 1000000;
   const delta = 385000.56 + sum_r / 1000;
 
-  console.table({
-    jde,
-    T,
-    L_prime,
-    D,
-    M,
-    M_prime,
-    F,
-    A1,
-    A2,
-    A3,
-    E,
-    corrected_sum_b,
-    corrected_sum_l,
-    sum_r,
-    lambda,
-    beta,
-    delta,
-  });
+  // console.table({
+  //   jde,
+  //   T,
+  //   L_prime,
+  //   D,
+  //   M,
+  //   M_prime,
+  //   F,
+  //   A1,
+  //   A2,
+  //   A3,
+  //   E,
+  //   corrected_sum_b,
+  //   corrected_sum_l,
+  //   sum_r,
+  //   lambda,
+  //   beta,
+  //   delta,
+  // });
 
   return {
     l: lambda,

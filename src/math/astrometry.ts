@@ -103,3 +103,9 @@ export const equatorialToHorizontal = (
     alt: new DMS(alt),
   };
 };
+
+export const getHA = (alt: number, lat: number, dec: number): number => {
+  const cosHA = (sin(alt) - sin(lat) * sin(dec)) / (cos(lat) * cos(dec));
+
+  return acos(cosHA);
+};

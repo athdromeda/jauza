@@ -1,6 +1,6 @@
 {
   "name": "jauza",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -12,20 +12,29 @@
       "require": "./dist/index.cjs"
     }
   },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm && tsc --emitDeclarationOnly",
+    "build": "tsup src/index.ts --format cjs,esm --dts --sourcemap",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "keywords": [],
   "author": "athdromeda",
-  "license": "ISC",
-  "description": "",
+  "license": "MIT",
+  "description": "Jauza is a JavaScript/TypeScript library for Islamic astronomy calculations, including Hijri calendar conversions, Qibla direction, crescent moon observation, and prayer times.",
   "devDependencies": {
     "@types/node": "^26.1.2",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2",
+    "typescript": "^5.7.3",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   }
 }

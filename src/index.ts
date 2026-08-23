@@ -9,6 +9,7 @@ export { meeusLow } from "./algos/low-meeus-sun/index.js";
 export { meeusMoon } from "./algos/meeus-moon/index.js";
 export { getQibla } from "./utils/qibla.js";
 export { Rukyat } from "./modules/rukyat.js";
+export { Salat } from "./modules/salat.js";
 
 export function getEnv() {
   if (typeof window !== "undefined" && typeof document !== "undefined") {

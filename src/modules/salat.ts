@@ -7,6 +7,10 @@ import { Time } from "./time.js";
 
 type SalatOptions = {
   timezone?: number;
+  ishaAlt?: number;
+  fajrAlt?: number;
+  asrFactor?: 1 | 2;
+  dhuhaAlt?: number;
 };
 
 export class Salat {
@@ -39,18 +43,19 @@ export class Salat {
   }
 
   eot() {
-    const timezone = this.#options.timezone ?? Math.round(this.#observer.lng / 15);
-    const local = this.#time.jd - (timezone/24);
+    const timezone =
+      this.#options.timezone ?? Math.round(this.#observer.lng / 15);
+    const local = this.#time.jd - timezone / 24;
     const T = (local - 2451545) / 36525;
     const L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T * T;
     const eot =
-    -(1789 + 237 * T) * sin(L0) -
-    (7146 - 62 * T) * cos(L0) +
-    (9934 - 14 * T) * sin(2 * L0) -
-    (29 + 5 * T) * cos(2 * L0) +
-    (74 + 10 * T) * sin(3 * L0) +
-    (320 - 4 * T) * cos(3 * L0) -
-    212 * sin(4 * L0);
+      -(1789 + 237 * T) * sin(L0) -
+      (7146 - 62 * T) * cos(L0) +
+      (9934 - 14 * T) * sin(2 * L0) -
+      (29 + 5 * T) * cos(2 * L0) +
+      (74 + 10 * T) * sin(3 * L0) +
+      (320 - 4 * T) * cos(3 * L0) -
+      212 * sin(4 * L0);
     // console.table({ jd: this.#time.jd, T, L0, eot });
 
     return eot / 1000;
@@ -66,11 +71,11 @@ export class Salat {
     return this.istiwa();
   }
 
-  asr(shadowFactor: 1 | 2 = 1) {
+  asr(shadowFactor?: 1 | 2) {
     if (!this.sunPosition) {
       throw new Error("Sun position not calculated");
     }
-    const factor = shadowFactor;
+    const factor = shadowFactor ?? this.#options.asrFactor ?? 1;
     const alt = acot(
       factor + tan(Math.abs(this.#observer.lat - this.sunPosition.dec.decimal))
     );
@@ -82,12 +87,12 @@ export class Salat {
     return this.istiwa() + this.ha(alt) / 15;
   }
 
-  isha(alt = -18) {
-    return this.istiwa() + this.ha(alt) / 15;
+  isha(alt?: number) {
+    return this.istiwa() + this.ha(alt ?? this.#options.ishaAlt ?? -18) / 15;
   }
 
-  fajr(alt = -20) {
-    return this.istiwa() - this.ha(alt) / 15;
+  fajr(alt?: number) {
+    return this.istiwa() - this.ha(alt ?? this.#options.fajrAlt ?? -20) / 15;
   }
 
   imsak() {
@@ -99,8 +104,8 @@ export class Salat {
     return this.istiwa() - this.ha(alt) / 15;
   }
 
-  dhuha(alt = 0.833) {
-    return this.istiwa() - this.ha(alt) / 15;
+  dhuha(alt?: number) {
+    return this.istiwa() - this.ha(alt ?? this.#options.dhuhaAlt ?? 0.833) / 15;
   }
 
   ha(alt: number) {

@@ -121,8 +121,10 @@ export class Time {
     const Y = month >= 3 ? year : year - 1;
 
     const A = Math.floor(Y / 100);
-    const B =
-      this.#calendar === CalendarSystem.Julian ? 0 : 2 - A + Math.floor(A / 4);
+    const gregorian =
+      this.#calendar !== CalendarSystem.Julian &&
+      this.isGregorianDate(year, month, day);
+    const B = gregorian ? 2 - A + Math.floor(A / 4) : 0;
 
     return (
       1720994.5 +
@@ -132,6 +134,14 @@ export class Time {
       day +
       (hour + minute / 60 + second / 3600) / 24
     );
+  }
+
+  protected isGregorianDate(year: number, month: number, day: number): boolean {
+    if (year > 1582) return true;
+    if (year < 1582) return false;
+    if (month > 10) return true;
+    if (month < 10) return false;
+    return day >= 15;
   }
 
   protected getCivil(): CivilTime {
@@ -192,7 +202,7 @@ export class Time {
     const Z = Math.floor(jd1);
     const F = jd1 - Z;
     const A =
-      Z < 2299161
+      this.#calendar === CalendarSystem.Julian || Z < 2299161
         ? Z
         : Z +
           1 +

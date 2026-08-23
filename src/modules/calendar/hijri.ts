@@ -1,5 +1,7 @@
 import { Time } from "../time.js";
 import { GregorianCalendar } from "./gregorian.js";
+import { HMS } from "../angle.js";
+import { decToHms } from "../../math/unit.js";
 
 export const HIJRI_EPOCH = 1948438.5;
 export const HIJRI_LEAP_YEARS = [2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29];
@@ -26,35 +28,97 @@ export class HijriCalendar extends Time {
     const daysInCompletedCycles = completedCycles * DAYS_IN_CYCLE;
     const daysInRemainder = getAcculumatedDaysInRemainderYear(remainder);
     const daysInMonth = getAcculumatedDaysInMonth(completedMonth);
+    const timeFraction = (hour + minute / 60 + second / 3600) / 24;
 
     return isNegativeYear
       ? HIJRI_EPOCH -
           (daysInCompletedCycles + daysInRemainder) +
-          (daysInMonth + day)
+          (daysInMonth + day) +
+          timeFraction
       : HIJRI_EPOCH +
           (daysInCompletedCycles + daysInRemainder) +
-          (daysInMonth + day);
+          (daysInMonth + day) +
+          timeFraction;
   }
 
   fromJD(jd: number) {
-    const delta = jd - HIJRI_EPOCH;
-    const isNegative = delta < 0;
-    const completedCycles = Math.floor(delta / DAYS_IN_CYCLE);
-    const baseYear = completedCycles * 30;
-    const { remainderYears, remainderDays } =
-      getRemainderYearsFromAcculumatedDays(delta % DAYS_IN_CYCLE);
+    const totalDays = jd - HIJRI_EPOCH;
+    const H = Math.floor(totalDays);
+    const { hours, minutes, seconds } = decToHms(
+      Math.round((totalDays - H) * 24 * 1e6) / 1e6
+    );
+    const hms = new HMS(hours, minutes, seconds);
 
-    const { months, remainingDays } =
-      getMonthsFromAcculumatedDays(remainderDays);
-    const result = baseYear + remainderYears;
+    if (H >= 0) {
+      const completedCycles = Math.floor(H / DAYS_IN_CYCLE);
+      const baseYear = completedCycles * 30;
+      const rem = H - completedCycles * DAYS_IN_CYCLE;
+
+      let r = 0;
+      while (r < 29 && ACCUMULATED_DAYS_IN_CYCLE[r + 1]! < rem) r++;
+
+      const year = baseYear + r + 1;
+      const daysIntoYear = rem - ACCUMULATED_DAYS_IN_CYCLE[r]!;
+
+      let monthIdx = 0;
+      while (
+        monthIdx < 11 &&
+        getAcculumatedDaysInMonth(monthIdx + 1) <= daysIntoYear - 1
+      ) {
+        monthIdx++;
+      }
+      const day = daysIntoYear - getAcculumatedDaysInMonth(monthIdx);
+
+      return {
+        year,
+        month: monthIdx + 1,
+        day,
+        hour: hms.hour,
+        minute: hms.min,
+        second: hms.sec,
+      };
+    }
+
+    const absH = -H;
+    const ccMin = Math.floor((absH + 1) / DAYS_IN_CYCLE);
+    const ccMax = Math.floor((absH + 355) / DAYS_IN_CYCLE);
+
+    for (let cc = ccMin; cc <= ccMax; cc++) {
+      for (let r = 0; r < 30; r++) {
+        const M = H + cc * DAYS_IN_CYCLE + ACCUMULATED_DAYS_IN_CYCLE[r]!;
+        if (M < 1 || M > 355) continue;
+
+        let monthIdx = 0;
+        while (
+          monthIdx < 11 &&
+          getAcculumatedDaysInMonth(monthIdx + 1) <= M - 1
+        ) {
+          monthIdx++;
+        }
+        const day = M - getAcculumatedDaysInMonth(monthIdx);
+        if (day < 1 || day > 30) continue;
+
+        const completedYear = cc * 30 + r;
+        const year = -(completedYear - 1);
+
+        return {
+          year,
+          month: monthIdx + 1,
+          day,
+          hour: hms.hour,
+          minute: hms.min,
+          second: hms.sec,
+        };
+      }
+    }
 
     return {
-      year: isNegative ? result * -1 - 1 : result,
-      month: months + 1,
-      day: remainingDays + 1,
-      hour: 0,
-      minute: 0,
-      second: 0, // TODO: handle this time fraction
+      year: 0,
+      month: 1,
+      day: 1,
+      hour: hms.hour,
+      minute: hms.min,
+      second: hms.sec,
     };
   }
 
@@ -71,21 +135,6 @@ export function getAcculumatedDaysInRemainderYear(remainderYear: number) {
   return remainderYear * 354 + accumulatedLeapDays;
 }
 
-export function getRemainderYearsFromAcculumatedDays(days: number) {
-  const remainderYears = ACCUMULATED_DAYS_IN_CYCLE.filter(
-    (accDays) => accDays <= days
-  ).length;
-  const remainderDays =
-    days - (ACCUMULATED_DAYS_IN_CYCLE[remainderYears - 1] || 0);
-  return { remainderYears, remainderDays };
-}
-
 export function getAcculumatedDaysInMonth(month: number) {
   return month * 29 + Math.ceil(month / 2);
-}
-
-export function getMonthsFromAcculumatedDays(days: number) {
-  const months = Math.floor(days / 29);
-  const remainingDays = days % 29;
-  return { months, remainingDays };
 }

@@ -51,7 +51,7 @@ export class Salat {
     (74 + 10 * T) * sin(3 * L0) +
     (320 - 4 * T) * cos(3 * L0) -
     212 * sin(4 * L0);
-    console.table({ jd: this.#time.jd, T, L0, eot });
+    // console.table({ jd: this.#time.jd, T, L0, eot });
 
     return eot / 1000;
   }

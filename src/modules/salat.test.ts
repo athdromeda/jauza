@@ -11,7 +11,6 @@ describe("Salat", () => {
 
     const jakarta = new Earth(-6.166667, 106.85, 50);
     const salat = new Salat(new Time(2009, 6, 12, 12), {timezone: 7}).at(jakarta).with(meeusLow);
-    console.log(salat.info());
 
     // Shubuh pukul 4:35:51 WIB = pukul 4:36 WIB.
     // Terbit Matahari pukul 5:58:18 WIB = pukul 5:58 WIB.

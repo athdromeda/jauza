@@ -1,7 +1,14 @@
 export { Earth } from "./modules/earth.js";
+export { Moon } from "./modules/moon.js";
+export { Sun } from "./modules/sun.js";
 export { JulianCalendar } from "./modules/calendar/julian.js";
 export { GregorianCalendar } from "./modules/calendar/gregorian.js";
 export { HijriCalendar } from "./modules/calendar/hijri.js";
+export { Time } from "./modules/time.js";
+export { meeusLow } from "./algos/low-meeus-sun/index.js";
+export { meeusMoon } from "./algos/meeus-moon/index.js";
+export { getQibla } from "./utils/qibla.js";
+export { Rukyat } from "./modules/rukyat.js";
 
 export function getEnv() {
   if (typeof window !== "undefined" && typeof document !== "undefined") {

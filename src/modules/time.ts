@@ -5,6 +5,7 @@ import {
   type TimeFormatOptions,
   type TimeOptions,
 } from "../types.js";
+import { getPasaranDay } from "../utils/pasaran.js";
 import { getDeltaT } from "../utils/time.js";
 
 export class Time {
@@ -254,12 +255,78 @@ export class Time {
     return options?.calendar || CalendarSystem.Gregorian;
   }
 
-  format(options?: TimeFormatOptions) {
+  private formatString(pattern: string, locale?: string): string {
+    const civil = this.getCivil();
+    const loc = locale || "en-US";
+    const date = new Date(civil.year, civil.month - 1, civil.day);
+
+    const dayName = new Intl.DateTimeFormat(loc, { weekday: "long" }).format(
+      date
+    );
+    const dayNameShort = new Intl.DateTimeFormat(loc, {
+      weekday: "short",
+    }).format(date);
+    const monthName = new Intl.DateTimeFormat(loc, { month: "long" }).format(
+      date
+    );
+    const monthNameShort = new Intl.DateTimeFormat(loc, {
+      month: "short",
+    }).format(date);
+
+    const h12 = civil.hour % 12 || 12;
+    const ampm = civil.hour < 12 ? "AM" : "PM";
+
+    const pasaran = getPasaranDay(this.jd) || "Kliwon";
+
+    const tokens: Record<string, string> = {
+      YYYY: String(civil.year),
+      YY: String(civil.year).slice(-2),
+      MMMM: monthName,
+      MMM: monthNameShort,
+      MM: String(civil.month).padStart(2, "0"),
+      M: String(civil.month),
+      DD: String(civil.day).padStart(2, "0"),
+      D: String(civil.day),
+      dddd: dayName,
+      ddd: dayNameShort,
+      HH: String(civil.hour).padStart(2, "0"),
+      H: String(civil.hour),
+      hh: String(h12).padStart(2, "0"),
+      h: String(h12),
+      mm: String(civil.minute).padStart(2, "0"),
+      m: String(civil.minute),
+      ss: String(civil.second).padStart(2, "0"),
+      s: String(civil.second),
+      A: ampm,
+      a: ampm.toLowerCase(),
+      PPP: pasaran.charAt(0).toUpperCase() + pasaran.slice(1),
+      PP: pasaran.charAt(0).toUpperCase() + pasaran.slice(1),
+      P: pasaran.charAt(0).toUpperCase() + pasaran.slice(1),
+      ppp: pasaran.toLowerCase(),
+      pp: pasaran.toLowerCase(),
+      p: pasaran.toLowerCase(),
+    };
+
+    return pattern.replace(
+      /dddd|ddd|YYYY|YY|MMMM|MMM|MM|M|DD|D|HH|H|hh|h|mm|m|ss|s|PPP|PP|ppp|pp|P|p|A|a/g,
+      (match) => tokens[match] || match
+    );
+  }
+
+  format(): string;
+  format(pattern: string): string;
+  format(options: TimeFormatOptions): string;
+  format(pattern: string, options: TimeFormatOptions): string;
+  format(patternOrOptions?: string | TimeFormatOptions, options?: TimeFormatOptions): string {
+    if (typeof patternOrOptions === "string") {
+      return this.formatString(patternOrOptions, options?.locale);
+    }
+
     const civil = this.getCivil();
     const date = new Date(civil.year, civil.month - 1, civil.day);
     const month = date.toLocaleString(
-      options?.locale || "en-US",
-      options?.options || { month: "long" }
+      patternOrOptions?.locale || "en-US",
+      patternOrOptions?.options || { month: "long" }
     );
     return `${civil.day} ${month} ${civil.year} ${civil.hour}:${civil.minute}:${civil.second}`;
   }

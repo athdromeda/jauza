@@ -1,6 +1,6 @@
 {
   "name": "@jauza/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -10,6 +10,26 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./math": {
+      "types": "./dist/math/index.d.ts",
+      "import": "./dist/math/index.js",
+      "require": "./dist/math/index.cjs"
+    },
+    "./position": {
+      "types": "./dist/position/index.d.ts",
+      "import": "./dist/position/index.js",
+      "require": "./dist/position/index.cjs"
+    },
+    "./algos": {
+      "types": "./dist/algos/index.d.ts",
+      "import": "./dist/algos/index.js",
+      "require": "./dist/algos/index.cjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "require": "./dist/types.cjs"
     }
   },
   "files": [
@@ -17,8 +37,8 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --sourcemap",
-    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "build": "tsup src/index.ts src/math/index.ts src/position/index.ts src/algos/index.ts src/types.ts --format cjs,esm --dts --sourcemap",
+    "dev": "tsup src/index.ts src/math/index.ts src/position/index.ts src/algos/index.ts src/types.ts --format cjs,esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

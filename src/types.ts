@@ -2,6 +2,7 @@ import type { DMS } from "./modules/angle.js";
 import type { Frame, Origin } from "./modules/position.js";
 
 export type Vec3 = [number, number, number];
+export type Vec3Tuple = Vec3;
 export type Algo = (time: Date) => Vec3;
 
 export type TimeOptions = {

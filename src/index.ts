@@ -5,8 +5,7 @@ export { JulianCalendar } from "./modules/calendar/julian.js";
 export { GregorianCalendar } from "./modules/calendar/gregorian.js";
 export { HijriCalendar } from "./modules/calendar/hijri.js";
 export { Time } from "./modules/time.js";
-export { meeusLow } from "./algos/low-meeus-sun/index.js";
-export { meeusMoon } from "./algos/meeus-moon/index.js";
+export { Angle } from "./modules/angle.js";
 export { getQibla } from "./utils/qibla.js";
 export { Rukyat } from "./modules/rukyat.js";
 export { Salat } from "./modules/salat.js";
@@ -23,3 +22,6 @@ export function getEnv() {
   }
   return "unknown";
 }
+
+export * from "./math/index.js";
+export * from "./algos/index.js";

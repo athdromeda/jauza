@@ -52,6 +52,7 @@ export enum CalendarSystem {
 export interface TimeFormatOptions {
   locale?: string;
   options?: Intl.DateTimeFormatOptions;
+  hijriMonths?: string[];
 }
 
 export type AlgoConfig = {

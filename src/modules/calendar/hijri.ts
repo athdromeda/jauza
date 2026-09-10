@@ -2,6 +2,8 @@ import { Time } from "../time.js";
 import { GregorianCalendar } from "./gregorian.js";
 import { HMS } from "../angle.js";
 import { decToHms } from "../../math/unit.js";
+import { CalendarSystem } from "../../types.js";
+export { HIJRI_MONTHS } from "../../data/calendar.js";
 
 export const HIJRI_EPOCH = 1948438.5;
 export const HIJRI_LEAP_YEARS = [2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29];
@@ -11,6 +13,10 @@ export const ACCUMULATED_DAYS_IN_CYCLE = Array.from({ length: 30 }, (_, i) =>
 export const DAYS_IN_CYCLE = 10631;
 
 export class HijriCalendar extends Time {
+  protected resolveCalendar() {
+    return CalendarSystem.Hijri;
+  }
+
   protected civilToJDUt(
     year: number,
     month: number,

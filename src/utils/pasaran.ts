@@ -1,10 +1,4 @@
-export const PASARAN_DAYS = [
-  "Pahing",
-  "Pon",
-  "Wage",
-  "Kliwon",
-  "Legi",
-] as const;
+import { PASARAN_DAYS } from "../data/calendar.js";
 
 export const getPasaranDay = (jd: number) => {
   const dayIndex = Math.floor(jd) % 5;

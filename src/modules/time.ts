@@ -7,6 +7,7 @@ import {
 } from "../types.js";
 import { getPasaranDay } from "../utils/pasaran.js";
 import { getDeltaT } from "../utils/time.js";
+import { HIJRI_MONTHS } from "../data/calendar.js";
 
 export class Time {
   #jd: number;
@@ -255,9 +256,10 @@ export class Time {
     return options?.calendar || CalendarSystem.Gregorian;
   }
 
-  private formatString(pattern: string, locale?: string): string {
+  private formatString(pattern: string, locale?: string, hijriMonths?: string[]): string {
     const civil = this.getCivil();
     const loc = locale || "en-US";
+    const isHijri = this.#calendar === CalendarSystem.Hijri;
     const date = new Date(civil.year, civil.month - 1, civil.day);
 
     const dayName = new Intl.DateTimeFormat(loc, { weekday: "long" }).format(
@@ -266,12 +268,20 @@ export class Time {
     const dayNameShort = new Intl.DateTimeFormat(loc, {
       weekday: "short",
     }).format(date);
-    const monthName = new Intl.DateTimeFormat(loc, { month: "long" }).format(
-      date
-    );
-    const monthNameShort = new Intl.DateTimeFormat(loc, {
-      month: "short",
-    }).format(date);
+
+    let monthName: string;
+    let monthNameShort: string;
+
+    if (isHijri) {
+      const months = hijriMonths || [...HIJRI_MONTHS];
+      monthName = months[civil.month - 1] || "";
+      monthNameShort = monthName.slice(0, 3);
+    } else {
+      monthName = new Intl.DateTimeFormat(loc, { month: "long" }).format(date);
+      monthNameShort = new Intl.DateTimeFormat(loc, {
+        month: "short",
+      }).format(date);
+    }
 
     const h12 = civil.hour % 12 || 12;
     const ampm = civil.hour < 12 ? "AM" : "PM";
@@ -319,15 +329,24 @@ export class Time {
   format(pattern: string, options: TimeFormatOptions): string;
   format(patternOrOptions?: string | TimeFormatOptions, options?: TimeFormatOptions): string {
     if (typeof patternOrOptions === "string") {
-      return this.formatString(patternOrOptions, options?.locale);
+      return this.formatString(patternOrOptions, options?.locale, options?.hijriMonths);
     }
 
     const civil = this.getCivil();
+    const isHijri = this.#calendar === CalendarSystem.Hijri;
     const date = new Date(civil.year, civil.month - 1, civil.day);
-    const month = date.toLocaleString(
-      patternOrOptions?.locale || "en-US",
-      patternOrOptions?.options || { month: "long" }
-    );
+
+    let month: string;
+    if (isHijri) {
+      const months = patternOrOptions?.hijriMonths || [...HIJRI_MONTHS];
+      month = months[civil.month - 1] || "";
+    } else {
+      month = date.toLocaleString(
+        patternOrOptions?.locale || "en-US",
+        patternOrOptions?.options || { month: "long" }
+      );
+    }
+
     return `${civil.day} ${month} ${civil.year} ${civil.hour}:${civil.minute}:${civil.second}`;
   }
 

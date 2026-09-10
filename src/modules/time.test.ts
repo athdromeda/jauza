@@ -192,18 +192,35 @@ describe("Time.format()", () => {
   });
 
   describe("Hijri calendar", () => {
-    it("should format Hijri dates with string pattern", () => {
+    it("should format Hijri dates with default month names", () => {
       const hijri = new HijriCalendar(1446, 3, 15);
       const result = hijri.format("D MMMM YYYY");
-      expect(result).toMatch(/^\d+ \w+ \d+$/);
+      expect(result).toBe("15 Rabi'ul Awwal 1446");
     });
 
     it("should format Hijri dates with pasaran", () => {
       const hijri = new HijriCalendar(1446, 3, 15);
       const result = hijri.format("D MMMM YYYY PPP");
       expect(result).toMatch(
-        /^\d+ \w+ \d+ (Kliwon|Legi|Pahing|Pon|Wage)$/
+        /^\d+ [\w\s']+ \d+ (Kliwon|Legi|Pahing|Pon|Wage)$/
       );
+    });
+
+    it("should use custom hijriMonths when provided", () => {
+      const hijri = new HijriCalendar(1446, 9, 1);
+      const customMonths = [
+        "Muharram", "Safar", "Rabi I", "Rabi II",
+        "Jumada I", "Jumada II", "Rajab", "Sha'ban",
+        "Ramadan", "Shawwal", "Dhul Qa'dah", "Dhul Hijjah",
+      ];
+      const result = hijri.format("D MMMM YYYY", { hijriMonths: customMonths });
+      expect(result).toBe("1 Ramadan 1446");
+    });
+
+    it("should format default options with Hijri month names", () => {
+      const hijri = new HijriCalendar(1446, 10, 1);
+      const result = hijri.format();
+      expect(result).toContain("Syawwal");
     });
   });
 });

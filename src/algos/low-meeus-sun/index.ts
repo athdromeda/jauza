@@ -1,15 +1,21 @@
 import { cos, sin } from "../../math/trigonometry.js";
 import { normalizeAngle } from "../../math/unit.js";
-import { eclipticOfDate } from "../../modules/position.js";
-import { Time } from "../../modules/time.js";
-import type { AlgoConfig, HeliocentricEcliptic } from "../../types.js";
-import { getDeltaT } from "../../utils/time.js";
+import { meanEclipticOfDate, trueEclipticOfDate } from "../../modules/position.js";
+import {
+  cartToSph,
+  sphToCart,
+} from "../../frames/convert.js";
+import {
+  type AlgorithmAdapter,
+  type ExtendedAlgorithmMetadata,
+  type TransformationEdge,
+} from "../../contract.js";
+import type { HeliocentricEcliptic } from "../../types.js";
+import { Vec3 } from "../../modules/vec3.js";
 
-function earth(input: { jd: number }): HeliocentricEcliptic {
+function earth(input: { jd: number }) {
   const { jd } = input;
-  const year = new Time(jd).year;
-  const jde = jd + getDeltaT(year) / 86400;
-  const T = (jde - 2451545) / 36525;
+  const T = (jd - 2451545) / 36525;
 
   const L0 = 280.46645 + 36000.76983 * T;
   const M0 = 357.5291 + 35999.0503 * T;
@@ -23,11 +29,6 @@ function earth(input: { jd: number }): HeliocentricEcliptic {
   const L = normalizeAngle(L0 + C);
   const M = normalizeAngle(M0 + C);
 
-  const omega = 125.04452 - 1934.13626 * T;
-  const epsilon0 = 23.43929111 - 0.01300417 * T;
-  const deltaEpsilon = 0.002555556 * cos(omega) + 0.00015833 * cos(2 * L0);
-  const epsilon = epsilon0 + deltaEpsilon;
-
   // Geocentric ecliptic coordinates
   const lambda = L;
   const beta = 0;
@@ -36,40 +37,11 @@ function earth(input: { jd: number }): HeliocentricEcliptic {
   // Heliocentric ecliptic coordinates
   const l = normalizeAngle(lambda + 180);
   const b = -beta;
-  // console.log("earth", {
-  //   jd,
-  //   jde,
-  //   T,
-  //   deltaT: getDeltaT(year),
-  //   L0,
-  //   M0,
-  //   C,
-  //   e,
-  //   L,
-  //   M,
-  //   epsilon,
-  //   lambda,
-  //   beta,
-  //   r,
-  //   l,
-  //   b,
-  // });
 
   return {
     l,
     b,
-    epsilon,
     r,
-    corrections: {
-      aberration: {
-        lon: -0.00569,
-        lat: 0,
-      },
-      nutation: {
-        lon: -0.00478 * sin(omega),
-        obl: 0,
-      },
-    },
   };
 }
 
@@ -81,19 +53,43 @@ function sun(input: { jd: number }) {
   };
 }
 
-export const meeusLow: AlgoConfig = {
-  name: "MeeusLow",
+const annualAberration: TransformationEdge = {
+  from: { system: "ecliptic", reference: trueEclipticOfDate, center: "earth" },
+  to: { system: "ecliptic", reference: trueEclipticOfDate, center: "earth" },
+  cost: 0.1,
+  correction: "annual-aberration",
+  label: "annual aberration (Meeus 24.a)",
+  apply: (v: Vec3) => {
+    const [lon, lat, r] = cartToSph(v.x, v.y, v.z);
+    const [x, y, z] = sphToCart(lon - 0.00569, lat, r);
+    return new Vec3(x, y, z);
+  },
+};
+
+const metadata: ExtendedAlgorithmMetadata = {
+  timeScale: "TDB",
+  epoch: "mean-of-date",
+  validity: { note: "1970..2030 (low precision)" },
+  corrections: [],
+  transformations: [annualAberration],
+};
+
+export const meeusLow: AlgorithmAdapter<HeliocentricEcliptic> = {
+  name: "Meeus Low-Precision Sun",
+  metadata,
   bodies: ["SUN", "EARTH"],
   EARTH: {
     outputType: "ECLIPTIC",
     origin: "sun",
-    frame: eclipticOfDate,
+    system: "ecliptic",
+    reference: meanEclipticOfDate,
     formula: earth,
   },
   SUN: {
     outputType: "ECLIPTIC",
     origin: "sun",
-    frame: eclipticOfDate,
+    system: "ecliptic",
+    reference: meanEclipticOfDate,
     formula: sun,
   },
 };

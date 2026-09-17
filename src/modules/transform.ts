@@ -1,11 +1,13 @@
 import { asin, atan2, cos, sin } from "../math/trigonometry.js";
-import { eclipticOfDate } from "./position.js";
+import { toFrame } from "../frames/convert.js";
+import { meanEclipticOfDate } from "./position.js";
 import type {
   CartesianPosition,
-  Frame,
   Origin,
   Position,
+  Reference,
   SphericalPosition,
+  System,
 } from "./position.js";
 import { Vec3 } from "./vec3.js";
 import {
@@ -15,12 +17,16 @@ import {
   type BodyConfig,
 } from "../types.js";
 
-function describeFrame(f: Frame): string {
-  return `${f.type}/${f.equinox}`;
+function describeReference(r: Reference): string {
+  return `${r.frame}/${r.orientation}`;
 }
 
-export function assertSameFrame(a: Frame, b: Frame): void {
-  if (a.type !== b.type || a.equinox !== b.equinox) {
+export function referencesEqual(a: Reference, b: Reference): boolean {
+  return a.frame === b.frame && a.orientation === b.orientation;
+}
+
+export function assertSameReference(a: Reference, b: Reference): void {
+  if (!referencesEqual(a, b)) {
     throw new FrameMismatchError(a, b);
   }
 }
@@ -40,7 +46,8 @@ export function toCartesian(pos: Position): CartesianPosition {
       vec3: sphericalToCartesian(lon, lat, r),
     },
     origin: pos.origin,
-    frame: pos.frame,
+    system: pos.system,
+    reference: pos.reference,
   };
 }
 
@@ -58,19 +65,53 @@ export function toSpherical(pos: Position): SphericalPosition {
       r,
     },
     origin: pos.origin,
-    frame: pos.frame,
+    system: pos.system,
+    reference: pos.reference,
   };
 }
 
 export type OriginResolver = {
-  readonly frame: Frame;
+  readonly reference: Reference;
+  readonly system: System;
   delta(from: Origin, to: Origin): Vec3;
 };
 
-export function createResolver(
+const firstReferenceOfEdges = (
   edges: Partial<Record<Origin, Position>>
+): Reference | undefined => {
+  for (const key of Object.keys(edges) as Origin[]) {
+    const edge = edges[key];
+    if (edge) return edge.reference;
+  }
+  return undefined;
+};
+
+const firstSystemOfEdges = (
+  edges: Partial<Record<Origin, Position>>
+): System | undefined => {
+  for (const key of Object.keys(edges) as Origin[]) {
+    const edge = edges[key];
+    if (edge) return edge.system;
+  }
+  return undefined;
+};
+
+export function createResolver(
+  edges: Partial<Record<Origin, Position>>,
+  reference: Reference = meanEclipticOfDate,
+  system: System = "ecliptic"
 ): OriginResolver {
-  const frame = eclipticOfDate;
+  const resolvedRef = reference ?? firstReferenceOfEdges(edges) ?? meanEclipticOfDate;
+  const resolvedSystem = system ?? firstSystemOfEdges(edges) ?? "ecliptic";
+  for (const key of Object.keys(edges) as Origin[]) {
+    const edge = edges[key];
+    if (edge) {
+      assertSameReference(edge.reference, resolvedRef);
+      if (edge.system !== resolvedSystem) {
+        throw new FrameMismatchError(edge.reference, resolvedRef);
+      }
+    }
+  }
 
   const neg = (v: Vec3) => new Vec3(-v.x, -v.y, -v.z);
 
@@ -82,7 +123,7 @@ export function createResolver(
       while (cur !== undefined) {
         const edge: Position | undefined = edges[cur];
         if (!edge) break;
-        assertSameFrame(edge.frame, frame);
+        assertSameReference(edge.reference, resolvedRef);
         sum = sum.add(toCartesian(edge).representation.vec3);
         cur = edge.origin;
         if (cur === ancestor) return sum;
@@ -97,12 +138,14 @@ export function createResolver(
     throw new MissingOriginOffsetError(`${body}->${at}`);
   };
 
-  return {
-    frame,
+  const resolver: OriginResolver = {
+    reference: resolvedRef,
+    system: resolvedSystem,
     delta(from, to) {
       return neg(posAt(to, from));
     },
   };
+  return resolver;
 }
 
 export function toOrigin(
@@ -110,7 +153,7 @@ export function toOrigin(
   target: Origin,
   resolver: OriginResolver
 ): Position {
-  assertSameFrame(pos.frame, resolver.frame);
+  assertSameReference(pos.reference, resolver.reference);
   if (pos.origin === target) return pos;
   const vec3 = toCartesian(pos).representation.vec3;
   return {
@@ -119,7 +162,8 @@ export function toOrigin(
       vec3: vec3.add(resolver.delta(pos.origin, target)),
     },
     origin: target,
-    frame: pos.frame,
+    system: pos.system,
+    reference: pos.reference,
   };
 }
 
@@ -128,7 +172,7 @@ export function relative(
   target: Position,
   resolver: OriginResolver
 ): Position {
-  assertSameFrame(observer.frame, target.frame);
+  assertSameReference(observer.reference, target.reference);
   const atObserverOrigin = toOrigin(target, observer.origin, resolver);
   const vec3 =
     atObserverOrigin.representation.kind === "cartesian"
@@ -138,7 +182,8 @@ export function relative(
   return {
     representation: { kind: "cartesian", vec3: vec3.sub(observerVec3) },
     origin: observer.origin,
-    frame: observer.frame,
+    system: observer.system,
+    reference: observer.reference,
   };
 }
 
@@ -150,27 +195,50 @@ export function toPosition(out: AlgoOutput, cfg: BodyConfig): Position {
   return {
     representation: { kind: "cartesian", vec3: sphericalToCartesian(l, b, r) },
     origin: cfg.origin,
-    frame: cfg.frame,
+    system: cfg.system,
+    reference: cfg.reference,
   };
 }
 
-export function buildResolver(algo: AlgoConfig, jd: number): OriginResolver {
+export function canonicalize(
+  pos: Position,
+  cfg: BodyConfig,
+  canonicalReference: Reference,
+  canonicalSystem: System,
+  jd: number
+): Position {
+  if (cfg.toCanonical) return cfg.toCanonical(pos, jd);
+  return toFrame(pos, canonicalSystem, canonicalReference, jd);
+}
+
+export function buildResolver(
+  algo: AlgoConfig,
+  jd: number,
+  canonicalReference: Reference = meanEclipticOfDate,
+  canonicalSystem: System = "ecliptic"
+): OriginResolver {
   const edges: Partial<Record<Origin, Position>> = {};
   for (const body of algo.bodies) {
     const cfg = algo[body];
     if (!cfg) continue;
     const child = ORIGIN_FOR[body];
     if (child === cfg.origin) continue;
-    edges[child] = toPosition(cfg.formula({ jd }), cfg);
+    edges[child] = canonicalize(
+      toPosition(cfg.formula({ jd }), cfg),
+      cfg,
+      canonicalReference,
+      canonicalSystem,
+      jd
+    );
   }
-  return createResolver(edges);
+  return createResolver(edges, canonicalReference, canonicalSystem);
 }
 
 // custom errors
 
 export class FrameMismatchError extends Error {
-  constructor(a: Frame, b: Frame) {
-    super(`Frame mismatch: ${describeFrame(a)} vs ${describeFrame(b)}`);
+  constructor(a: Reference, b: Reference) {
+    super(`Reference mismatch: ${describeReference(a)} vs ${describeReference(b)}`);
     this.name = "FrameMismatchError";
   }
 }

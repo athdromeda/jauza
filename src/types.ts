@@ -1,5 +1,6 @@
 import type { DMS } from "./modules/angle.js";
-import type { Frame, Origin } from "./modules/position.js";
+import type { Origin, Position, Reference, System } from "./modules/position.js";
+import type { TimeScale } from "./contract.js";
 
 export type Vec3 = [number, number, number];
 export type Vec3Tuple = Vec3;
@@ -8,6 +9,7 @@ export type Algo = (time: Date) => Vec3;
 export type TimeOptions = {
   timezone?: number;
   calendar?: CalendarSystem;
+  scale?: TimeScale;
 };
 export type TimeArgs =
   | [year: number]
@@ -72,8 +74,10 @@ export const ORIGIN_FOR: Record<BodyType, Origin> = {
 export type BodyConfig = {
   outputType: OutputType;
   origin: Origin;
-  frame: Frame;
+  system: System;
+  reference: Reference;
   formula: (input: AlgoInput) => AlgoOutput;
+  toCanonical?: (pos: Position, jd: number) => Position;
 };
 
 export type OutputType = "ECLIPTIC" | "EQUATORIAL";
@@ -84,30 +88,16 @@ export type AlgoInput = {
 
 export type AlgoOutput = GeocentricEcliptic | HeliocentricEcliptic; //to be added more later
 
-export type ApparentCorrection = {
-  aberration?: {
-    lon: number;
-    lat: number;
-  };
-  nutation?: {
-    lon: number;
-    obl: number;
-  };
-};
-
 export type GeocentricEcliptic = {
   lambda: number;
   beta: number;
   r: number;
-  epsilon?: number;
 };
 
 export type HeliocentricEcliptic = {
   l: number;
   b: number;
   r: number;
-  epsilon?: number;
-  corrections?: ApparentCorrection;
 };
 
 export interface EquatorialValues {

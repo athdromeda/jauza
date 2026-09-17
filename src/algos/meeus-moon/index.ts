@@ -1,15 +1,15 @@
 import { cos, sin } from "../../math/trigonometry.js";
 import { normalizeAngle } from "../../math/unit.js";
-import { eclipticOfDate } from "../../modules/position.js";
-import { Time } from "../../modules/time.js";
-import type { AlgoConfig } from "../../types.js";
-import { getDeltaT } from "../../utils/time.js";
+import { meanEclipticOfDate } from "../../modules/position.js";
+import type {
+  AlgorithmAdapter,
+  ExtendedAlgorithmMetadata,
+} from "../../contract.js";
+import type { GeocentricEcliptic } from "../../types.js";
 
-function moon(input: { jd: number }) {
+function moon(input: { jd: number }): GeocentricEcliptic {
   const { jd } = input;
-  const year = new Time(jd).year;
-  const jde = jd + getDeltaT(year) / 86400;
-  const T = (jde - 2451545) / 36525;
+  const T = (jd - 2451545) / 36525;
 
   const L_prime = normalizeAngle(
     218.3164477 +
@@ -145,8 +145,8 @@ function moon(input: { jd: number }) {
   // });
 
   return {
-    l: lambda,
-    b: beta,
+    lambda,
+    beta,
     r: delta,
   };
 }
@@ -286,13 +286,22 @@ const LUNAR_LATITUDE_PERIODIC: [number, number, number, number, number][] = [
   [2, -2, 0, 1, 107],
 ];
 
-export const meeusMoon: AlgoConfig = {
-  name: "MeeusLow",
+const metadata: ExtendedAlgorithmMetadata = {
+  timeScale: "TDB",
+  epoch: "mean-of-date",
+  validity: { note: "-2099..3000" },
+  corrections: [],
+};
+
+export const meeusMoon: AlgorithmAdapter<GeocentricEcliptic> = {
+  name: "Meeus Moon",
+  metadata,
   bodies: ["MOON"],
   MOON: {
     outputType: "ECLIPTIC",
     origin: "earth",
-    frame: eclipticOfDate,
+    system: "ecliptic",
+    reference: meanEclipticOfDate,
     formula: moon,
   },
 };

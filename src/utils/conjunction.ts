@@ -1,7 +1,14 @@
 import { normalizeAngle } from "../math/unit.js";
 import { Time } from "../modules/time.js";
 import { getDeltaT } from "./time.js";
-import type { AlgoConfig, AlgoOutput, BodyConfig, BodyType } from "../types.js";
+import type {
+  AlgoConfig,
+  AlgoOutput,
+  BodyConfig,
+  BodyType,
+} from "../types.js";
+import type { TimeScale } from "../contract.js";
+import { jdInScale, preferredScale } from "../frames/time-scale.js";
 import { brent } from "../math/numerics.js";
 
 function resolveConfig(algo: AlgoConfig, type: BodyType): BodyConfig {
@@ -12,14 +19,22 @@ function resolveConfig(algo: AlgoConfig, type: BodyType): BodyConfig {
   return cfg;
 }
 
-function longitudeOf(cfg: BodyConfig, jd: number): number {
-  const out = cfg.formula({ jd }) as AlgoOutput;
+const algoScale = (algo: AlgoConfig): TimeScale =>
+  preferredScale(algo, "UTC");
+
+function longitudeOf(
+  cfg: BodyConfig,
+  jd: number,
+  scale: TimeScale
+): number {
+  const callJd = jdInScale(jd, "UTC", scale);
+  const out = cfg.formula({ jd: callJd }) as AlgoOutput;
   const lon = "lambda" in out ? out.lambda : out.l;
   return normalizeAngle(lon, 0, 360);
 }
 
 export function moonLongitude(moonAlgo: AlgoConfig, jd: number): number {
-  return longitudeOf(resolveConfig(moonAlgo, "MOON"), jd);
+  return longitudeOf(resolveConfig(moonAlgo, "MOON"), jd, algoScale(moonAlgo));
 }
 
 export function sunLongitude(sunAlgo: AlgoConfig, jd: number): number {
@@ -31,7 +46,7 @@ export function sunLongitude(sunAlgo: AlgoConfig, jd: number): number {
     throw new Error("Rukyat: sun algo is missing both SUN and EARTH");
   }
 
-  const out = cfg.formula({ jd }) as AlgoOutput;
+  const out = cfg.formula({ jd: jdInScale(jd, "UTC", algoScale(sunAlgo)) }) as AlgoOutput;
   const lon = "lambda" in out ? out.lambda : out.l;
 
   return cfg.origin === "sun"
@@ -56,6 +71,8 @@ function resultAt(
   const year = new Time(jd).year;
 
   const ut = jd;
+  // Keep ΔT→TT for the reported epoch; neglect the ~1.7ms TDB↔TT offset here
+  // (it is far below the ~5-day search window and the root-finder tolerance).
   const jde = jd + getDeltaT(year) / 86400;
   return { jde, ut, moonLon, sunLon };
 }

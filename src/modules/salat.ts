@@ -36,8 +36,7 @@ export class Salat {
     const sun = this.#observer
       .at(this.#time)
       .observe(Sun)
-      .with(this.sunAlgo)
-      .apparent();
+      .with(this.sunAlgo);
     this.sunPosition = sun;
     return this;
   }

@@ -1,25 +1,72 @@
-import { eclipticToEquatorial } from "../math/astrometry.js";
-import { normalizeAngle } from "../math/unit.js";
+import {
+  coordinateState,
+  type AlgorithmAdapter,
+  type CoordinateState,
+  type CoordinateStateKey,
+  type Provenance,
+  type ResolutionStep,
+  type TransformationEdge,
+} from "../contract.js";
 import {
   type AlgoConfig,
-  type ApparentCorrection,
+  type AlgoOutput,
   type BodyType,
-  type HeliocentricEcliptic,
   ORIGIN_FOR,
 } from "../types.js";
+import { normalizeAngle } from "../math/unit.js";
+import {
+  applyCorrections,
+  edgeLabel,
+  GraphResolver,
+} from "./resolver.js";
 import { DMS } from "./angle.js";
-import type { Origin, Position } from "./position.js";
-import { eclipticOfDate } from "./position.js";
+import {
+  meanEclipticOfDate,
+  meanEquatorialOfDate,
+  trueEclipticOfDate,
+  trueEquatorialOfDate,
+  type Origin,
+  type Position,
+  type Reference,
+} from "./position.js";
 import type { OriginResolver } from "./transform.js";
 import {
   buildResolver,
+  canonicalize,
   createResolver,
+  referencesEqual,
   relative,
   toPosition,
   toSpherical,
 } from "./transform.js";
+import { meanObliquity, trueObliquity } from "../transformations/obliquity.js";
+import { toFrame } from "../frames/convert.js";
+import { EdgeRegistry, registerStandardEdges } from "../frames/registry.js";
+import {
+  feedJd,
+  feedScale,
+  graphContext,
+  graphJd,
+} from "../frames/time-scale.js";
 import type { Time } from "./time.js";
 import { Vec3 } from "./vec3.js";
+
+export type GeometricView = {
+  readonly position: CoordinateState<Vec3>;
+  readonly lambda: DMS;
+  readonly beta: DMS;
+  readonly r: number;
+  readonly ecliptic: {
+    readonly l: DMS;
+    readonly b: DMS;
+    readonly r: number;
+    readonly system: string;
+    readonly reference: Reference;
+  };
+  readonly ra: DMS;
+  readonly dec: DMS;
+  readonly epsilon: number;
+};
 
 export abstract class Body {
   readonly type: BodyType;
@@ -27,17 +74,26 @@ export abstract class Body {
   source: Position;
   target: Position;
   resolver: OriginResolver;
-  algo: AlgoConfig | null = null;
-  epsilon: number = 23.5;
-  appearance: "geometric" | "apparent" = "geometric";
-  corrections: ApparentCorrection | null = null;
+  algo: AlgorithmAdapter | null = null;
+
+  #registry: EdgeRegistry;
+  #graph: GraphResolver;
+  #geometricState: CoordinateState<Vec3> | null = null;
+  #apparentState: CoordinateState<Vec3> | null = null;
+  #dirty = true;
 
   constructor(time: Time, type: BodyType) {
     this.type = type;
     this.time = time;
-    this.source = this.homePosition;
-    this.target = this.homePosition;
+    this.#registry = registerStandardEdges(
+      new EdgeRegistry(),
+      ORIGIN_FOR[type]
+    );
+    this.#graph = new GraphResolver(this.#registry);
     this.resolver = createResolver({});
+    const home = this.homePosition;
+    this.source = home;
+    this.target = home;
   }
 
   get homeOrigin(): Origin {
@@ -48,7 +104,50 @@ export abstract class Body {
     return {
       representation: { kind: "cartesian", vec3: new Vec3(0, 0, 0) },
       origin: this.homeOrigin,
-      frame: eclipticOfDate,
+      system: this.resolver.system,
+      reference: this.resolver.reference,
+    };
+  }
+
+  get position(): CoordinateState<Vec3> {
+    this.#compute();
+    return this.#apparentState!;
+  }
+
+  get apparentState(): CoordinateState<Vec3> | null {
+    this.#compute();
+    return this.#apparentState;
+  }
+
+  geometric(): GeometricView {
+    this.#compute();
+    const s = this.#geometricState!;
+    const body = this;
+    return {
+      get position() {
+        return s;
+      },
+      get lambda() {
+        return body.#readLambda(s);
+      },
+      get beta() {
+        return body.#readBeta(s);
+      },
+      get r() {
+        return body.#readEcliptic(s, meanEclipticOfDate).r;
+      },
+      get ecliptic() {
+        return body.#readEcliptic(s, meanEclipticOfDate);
+      },
+      get ra() {
+        return body.#readRA(s, meanEquatorialOfDate);
+      },
+      get dec() {
+        return body.#readDec(s, meanEquatorialOfDate);
+      },
+      get epsilon() {
+        return meanObliquity(graphJd(body.time));
+      },
     };
   }
 
@@ -56,33 +155,82 @@ export abstract class Body {
     const target = new BodyClass(this.time);
     if (this.algo) target.with(this.algo);
     this.target = target.source;
-    return this;
+    return this.#refresh();
   }
 
   at(time: Time) {
     this.time = time;
+    this.#dirty = true;
+    return this;
+  }
+
+  #compute(): void {
+    if (!this.#dirty && this.#apparentState && this.#geometricState) return;
+    const rel = relative(this.source, this.target, this.resolver);
+    const position: Position = { ...rel, origin: this.homeOrigin };
+    this.#geometricState = coordinateState(
+      position,
+      this.type,
+      feedJd(this.time, this.algo),
+      feedScale(this.time, this.algo),
+      { dynamic: true }
+    );
+    this.#apparentState = this.#toApparent(this.#geometricState);
+    this.#dirty = false;
+  }
+
+  #toApparent(geo: CoordinateState<Vec3>): CoordinateState<Vec3> {
+    const ctx = graphContext(this.time);
+    const targetKey: CoordinateStateKey = {
+      system: "ecliptic",
+      reference: trueEclipticOfDate,
+      center: this.homeOrigin,
+    };
+    const traced = this.#graph.trace(geo, targetKey, ctx);
+    let state = geo;
+    const baseSteps: ResolutionStep[] = [];
+    for (const t of traced) {
+      state = t.state;
+      baseSteps.push({
+        label: edgeLabel(t.edge),
+        from: t.state.key,
+        to: t.edge.to,
+        corrections: t.edge.correction ? [t.edge.correction] : [],
+      });
+    }
+    return applyCorrections(state, ctx, this.#correctionEdges(), baseSteps)
+      .state;
+  }
+
+  #refresh(): this {
+    this.#dirty = true;
     return this;
   }
 
   with(algo: AlgoConfig) {
-    this.algo = algo;
+    this.algo = algo as AlgorithmAdapter;
+    const jd = feedJd(this.time, this.algo);
+    this.resolver = buildResolver(algo, jd);
     const cfg = algo[this.type];
     if (cfg) {
-      const raw = cfg.formula({ jd: this.time.jd }) as HeliocentricEcliptic;
-      this.source = toPosition(raw, cfg);
-      this.epsilon = raw.epsilon ?? this.epsilon;
-      this.corrections = raw.corrections ?? null;
+      const raw = cfg.formula({ jd }) as AlgoOutput;
+      this.source = canonicalize(
+        toPosition(raw, cfg),
+        cfg,
+        this.resolver.reference,
+        this.resolver.system,
+        jd
+      );
     }
-    this.resolver = buildResolver(algo, this.time.jd);
-    return this;
+    return this.#refresh();
   }
 
-  apparent() {
-    this.appearance = "apparent";
-    return this;
+  #correctionEdges(): TransformationEdge[] {
+    return this.algo?.metadata?.transformations ?? [];
   }
 
   get info() {
+    this.#compute();
     return {
       type: this.type,
       time: this.time.format(),
@@ -91,42 +239,92 @@ export abstract class Body {
       source: this.source,
       target: this.target,
       algo: this.algo?.name ?? null,
-      appearance: this.appearance,
+      position: this.#apparentState?.position ?? null,
+      geometric: this.#geometricState?.position ?? null,
     };
+  }
+
+  get explain(): Provenance | null {
+    this.#compute();
+    if (!this.#apparentState || !this.#geometricState) return null;
+    const ctx = {
+      ...graphContext(this.time),
+      ...(this.algo ? { algorithm: this.algo.name } : {}),
+    } as const;
+    return this.#graph.explain(
+      this.#geometricState,
+      this.#apparentState.key,
+      ctx
+    ).provenance;
+  }
+
+  #readLambda(state: CoordinateState<Vec3>): DMS {
+    const p = toSpherical(state.position);
+    return new DMS(normalizeAngle(p.representation.lon, 0, 360));
+  }
+
+  #readBeta(state: CoordinateState<Vec3>): DMS {
+    const p = toSpherical(state.position);
+    return new DMS(normalizeAngle(p.representation.lat, -90, 90));
+  }
+
+  #readEcliptic(
+    state: CoordinateState<Vec3>,
+    reference: Reference
+  ): GeometricView["ecliptic"] {
+    let pos = state.position;
+    if (
+      !referencesEqual(pos.reference, reference) ||
+      pos.system !== "ecliptic"
+    ) {
+      pos = toFrame(pos, "ecliptic", reference, graphJd(this.time));
+    }
+    const s = toSpherical(pos);
+    return {
+      l: new DMS(s.representation.lon),
+      b: new DMS(s.representation.lat),
+      r: s.representation.r,
+      system: pos.system,
+      reference: pos.reference,
+    };
+  }
+
+  #equatorialOf(
+    state: CoordinateState<Vec3>,
+    reference: Reference
+  ): CoordinateState<Vec3> {
+    const targetKey: CoordinateStateKey = {
+      system: "equatorial",
+      reference,
+      center: state.key.center,
+    };
+    const traced = this.#graph.trace(state, targetKey, graphContext(this.time));
+    return traced.length ? traced.at(-1)!.state : state;
+  }
+
+  #readRA(state: CoordinateState<Vec3>, reference: Reference): DMS {
+    const s = toSpherical(this.#equatorialOf(state, reference).position);
+    return new DMS(s.representation.lon);
+  }
+
+  #readDec(state: CoordinateState<Vec3>, reference: Reference): DMS {
+    const s = toSpherical(this.#equatorialOf(state, reference).position);
+    return new DMS(s.representation.lat);
   }
 
   get ecliptic() {
-    const pos = toSpherical(relative(this.source, this.target, this.resolver));
-    return {
-      l: new DMS(pos.representation.lon),
-      b: new DMS(pos.representation.lat),
-      r: pos.representation.r,
-    };
+    this.#compute();
+    return this.#readEcliptic(this.#apparentState!, trueEclipticOfDate);
   }
 
   get lambda() {
-    if (this.appearance === "apparent") {
-      const aberrationLon = this.corrections?.aberration?.lon ?? 0;
-      const nutationLon = this.corrections?.nutation?.lon ?? 0;
-      return new DMS(
-        normalizeAngle(
-          this.ecliptic.l.decimal + aberrationLon + nutationLon,
-          0,
-          360
-        )
-      );
-    }
-    return this.ecliptic.l;
+    this.#compute();
+    return this.#readLambda(this.#apparentState!);
   }
 
   get beta() {
-    if (this.appearance === "apparent") {
-      const aberrationLat = this.corrections?.aberration?.lat ?? 0;
-      return new DMS(
-        normalizeAngle(this.ecliptic.b.decimal + aberrationLat, -90, 90)
-      );
-    }
-    return this.ecliptic.b;
+    this.#compute();
+    return this.#readBeta(this.#apparentState!);
   }
 
   get r() {
@@ -134,14 +332,74 @@ export abstract class Body {
   }
 
   get ra() {
-    const ecliptic = this.ecliptic;
-    const equatorial = eclipticToEquatorial(ecliptic, this.epsilon);
-    return equatorial.ra;
+    this.#compute();
+    return this.#readRA(this.#apparentState!, trueEquatorialOfDate);
   }
 
   get dec() {
-    const ecliptic = this.ecliptic;
-    const equatorial = eclipticToEquatorial(ecliptic, this.epsilon);
-    return equatorial.dec;
+    this.#compute();
+    return this.#readDec(this.#apparentState!, trueEquatorialOfDate);
+  }
+
+  get epsilon() {
+    this.#compute();
+    return trueObliquity(graphJd(this.time));
+  }
+
+  toEquatorial(): this {
+    this.#compute();
+    if (
+      this.#geometricState &&
+      this.#geometricState.key.system !== "equatorial"
+    ) {
+      const targetKey: CoordinateStateKey = {
+        system: "equatorial",
+        reference: meanEquatorialOfDate,
+        center: this.homeOrigin,
+      };
+      const traced = this.#graph.trace(
+        this.#geometricState,
+        targetKey,
+        graphContext(this.time)
+      );
+      this.#geometricState = traced.length
+        ? traced.at(-1)!.state
+        : this.rekeyTo(this.#geometricState, targetKey);
+    }
+    if (
+      this.#apparentState &&
+      this.#apparentState.key.system !== "equatorial"
+    ) {
+      const targetKey: CoordinateStateKey = {
+        system: "equatorial",
+        reference: trueEquatorialOfDate,
+        center: this.homeOrigin,
+      };
+      const traced = this.#graph.trace(
+        this.#apparentState,
+        targetKey,
+        graphContext(this.time)
+      );
+      this.#apparentState = traced.length
+        ? traced.at(-1)!.state
+        : this.rekeyTo(this.#apparentState, targetKey);
+    }
+    return this;
+  }
+
+  private rekeyTo(
+    state: CoordinateState<Vec3>,
+    key: CoordinateStateKey
+  ): CoordinateState<Vec3> {
+    return {
+      ...state,
+      key,
+      position: {
+        ...state.position,
+        system: key.system,
+        reference: key.reference,
+        origin: key.center,
+      },
+    };
   }
 }

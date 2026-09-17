@@ -1,4 +1,6 @@
 import { decToHms, normalizeHour } from "../math/unit.js";
+import type { TimeScale } from "../contract.js";
+import { jdInScale } from "../frames/time-scale.js";
 import {
   CalendarSystem,
   type CivilTime,
@@ -6,7 +8,6 @@ import {
   type TimeOptions,
 } from "../types.js";
 import { getPasaranDay } from "../utils/pasaran.js";
-import { getDeltaT } from "../utils/time.js";
 import { HIJRI_MONTHS } from "../data/calendar.js";
 
 export class Time {
@@ -14,6 +15,7 @@ export class Time {
   #timezone: number;
   #calendar: CalendarSystem;
   #civil: CivilTime | null = null;
+  #scale: TimeScale = "UTC";
 
   constructor(jd: number);
   constructor(jd: number, options?: TimeOptions);
@@ -56,6 +58,7 @@ export class Time {
   ) {
     if (jdOrDate instanceof Date) {
       const opts = month as TimeOptions | undefined;
+      this.#scale = opts?.scale ?? "UTC";
       this.#timezone = opts?.timezone ?? 0;
       this.#calendar = this.resolveCalendar(opts);
       this.#jd = this.civilToJDUt(
@@ -75,6 +78,7 @@ export class Time {
     ) {
       const opts = month as TimeOptions | undefined;
       this.#jd = jdOrDate;
+      this.#scale = opts?.scale ?? "UTC";
       this.#timezone = opts?.timezone ?? 0;
       this.#calendar = this.resolveCalendar(opts);
       return;
@@ -93,6 +97,7 @@ export class Time {
         }
       });
 
+    this.#scale = opts?.scale ?? "UTC";
     this.#timezone = opts?.timezone ?? 0;
     this.#calendar = this.resolveCalendar(opts);
     this.#jd =
@@ -243,13 +248,22 @@ export class Time {
     return this.toGST();
   }
 
-  asDT() {
-    const year = this.year;
-    const deltaT = getDeltaT(year) / 86400;
-    return new Time(this.#jd - deltaT, {
+  get scale(): TimeScale {
+    return this.#scale;
+  }
+
+  inScale(scale: TimeScale): Time {
+    if (scale === this.#scale) return this;
+    return new Time(jdInScale(this.#jd, this.#scale, scale), {
       timezone: this.#timezone,
       calendar: this.#calendar,
+      scale,
     });
+  }
+
+  /** @deprecated superseded by inScale("TT") — returns a Time on the TT scale. */
+  asDT(): Time {
+    return this.inScale("TT");
   }
 
   protected resolveCalendar(options?: TimeOptions): CalendarSystem {

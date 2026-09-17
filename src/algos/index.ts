@@ -7,7 +7,6 @@ export {
   type AlgoOutput,
   type GeocentricEcliptic,
   type HeliocentricEcliptic,
-  type ApparentCorrection,
   ORIGIN_FOR,
 } from "../types.js";
 export {

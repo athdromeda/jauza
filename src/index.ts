@@ -26,3 +26,5 @@ export function getEnv() {
 export * from "./math/index.js";
 export * from "./algos/index.js";
 export * from "./utils/conjunction.js";
+export * from "./utils/visibility.js";
+

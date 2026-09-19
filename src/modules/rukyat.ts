@@ -7,6 +7,15 @@ import {
 import { HijriCalendar } from "./calendar/hijri.js";
 import type { AlgoConfig } from "../types.js";
 import type { Earth } from "./earth.js";
+import {
+  yallop,
+  odeh,
+  newMabims,
+  diyanet,
+  danjon,
+  type YallopResult,
+  type OdehResult,
+} from "../utils/visibility.js";
 
 type RukyatOptions = {};
 
@@ -16,6 +25,21 @@ type RukyatAlgos =
       moon: AlgoConfig;
     }
   | AlgoConfig;
+
+export type VisibilityParams = {
+  arcv?: number;
+  w?: number;
+  wPrime?: number;
+  danjonLimit?: number;
+};
+
+export type VisibilityResult = {
+  odeh: OdehResult;
+  newMabims: boolean;
+  yallop: YallopResult;
+  danjon: boolean;
+  diyanet: boolean;
+};
 
 export class Rukyat {
   #anchor: number;
@@ -104,5 +128,29 @@ export class Rukyat {
       )}%`,
       `Moon Age                            =  ${hilal.age.format()}`,
     ].join("\n");
+  }
+
+  visibility(params?: VisibilityParams): VisibilityResult {
+    const res = this.conjunction();
+    if (!res.hilal) {
+      throw new Error("Rukyat: call at(observer) before isVisible()");
+    }
+
+    const alt = res.hilal.moonAlt.decimal;
+    const arcl = res.hilal.elongation.decimal;
+
+    const arcv = params?.arcv ?? alt;
+    const rad = (arcl * Math.PI) / 180;
+    const defaultW = 15.5 * (1 - Math.cos(rad));
+    const w = params?.w ?? defaultW;
+    const wPrime = params?.wPrime ?? w;
+
+    return {
+      odeh: odeh(arcv, w),
+      newMabims: newMabims(alt, arcl),
+      yallop: yallop(arcv, wPrime),
+      danjon: danjon(arcl, params?.danjonLimit),
+      diyanet: diyanet(alt, arcl),
+    };
   }
 }

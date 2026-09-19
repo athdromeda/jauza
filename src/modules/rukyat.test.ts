@@ -4,6 +4,7 @@ import { meeusMoon } from "../algos/meeus-moon/index.js";
 import { meeusLow } from "../algos/low-meeus-sun/index.js";
 import { brent } from "../math/numerics.js";
 import { Time } from "./time.js";
+import { Earth } from "./earth.js";
 
 describe("numerics.brent", () => {
   it("finds sqrt(2)", () => {
@@ -88,5 +89,14 @@ describe("Rukyat.conjunction", () => {
 
     expect(customConjunctionCalled).toBe(false);
     expect(r.jde).toBeGreaterThan(0);
+  });
+});
+
+describe("Rukyat.visibility", () => {
+  it("throws if observer is not set", () => {
+    const r = new Rukyat(1447, 10).with({ sun: meeusLow, moon: meeusMoon });
+    expect(() => r.visibility()).toThrow(
+      "call at(observer) before visibility()"
+    );
   });
 });

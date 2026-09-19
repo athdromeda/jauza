@@ -9,6 +9,22 @@ export {
   type HeliocentricEcliptic,
   ORIGIN_FOR,
 } from "../types.js";
+export type {
+  AlgorithmAdapter,
+  ExtendedAlgorithmMetadata,
+  RequiredAlgorithmMetadata,
+  ValidityDomain,
+  Correction,
+  TransformationEdge,
+  TransformationContext,
+  CoordinateState,
+  CoordinateStateKey,
+  ResolutionStep,
+  ResolutionPlan,
+  Provenance,
+  TimeScale,
+} from "../contract.js";
+export { coordinateState, keyOf } from "../contract.js";
 export {
   findConjunction,
   moonLongitude,

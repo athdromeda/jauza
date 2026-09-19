@@ -44,4 +44,48 @@ describe("Rukyat.conjunction", () => {
     const ut = new Time(r.ut);
     expect(ut.year).toBe(2026);
   });
+
+  it("uses algorithm custom conjunction function when sun and moon algorithms are the same", () => {
+    const expectedResult = {
+      jde: 2461118.55989,
+      ut: 2461118.55902,
+      moonLon: 358.4633,
+      sunLon: 358.4633,
+    };
+
+    let calledWithAnchor: number | undefined;
+
+    const mockAlgo = {
+      ...meeusMoon,
+      name: "mock-custom-conjunction",
+      conjunction: (anchorJd: number) => {
+        calledWithAnchor = anchorJd;
+        return expectedResult;
+      },
+    };
+
+    const r = new Rukyat(1447, 10).with(mockAlgo).conjunction();
+    expect(r).toEqual(expectedResult);
+    expect(calledWithAnchor).toBeDefined();
+  });
+
+  it("does NOT use custom conjunction function when sun and moon algorithms are different", () => {
+    let customConjunctionCalled = false;
+
+    const mockAlgo = {
+      ...meeusMoon,
+      name: "mock-custom-conjunction",
+      conjunction: () => {
+        customConjunctionCalled = true;
+        return { jde: 0, ut: 0, moonLon: 0, sunLon: 0 };
+      },
+    };
+
+    const r = new Rukyat(1447, 10)
+      .with({ sun: meeusLow, moon: mockAlgo })
+      .conjunction();
+
+    expect(customConjunctionCalled).toBe(false);
+    expect(r.jde).toBeGreaterThan(0);
+  });
 });

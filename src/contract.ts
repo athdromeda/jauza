@@ -1,4 +1,5 @@
-import type { AlgoConfig, BodyType, AlgoOutput } from "./types.js";
+import type { AlgoConfig, BodyType, AlgoOutput, ConjunctionFn } from "./types.js";
+export type { ConjunctionFn };
 import type {
   Origin,
   Position,
@@ -111,6 +112,7 @@ export type ExtendedAlgorithmMetadata = RequiredAlgorithmMetadata & {
 
 export type AlgorithmAdapter<O extends AlgoOutput = AlgoOutput> = AlgoConfig & {
   readonly metadata: ExtendedAlgorithmMetadata;
+  readonly conjunction?: ConjunctionFn;
 };
 
 export function coordinateState(

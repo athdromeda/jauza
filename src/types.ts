@@ -1,6 +1,7 @@
 import type { DMS } from "./modules/angle.js";
 import type { Origin, Position, Reference, System } from "./modules/position.js";
 import type { TimeScale } from "./contract.js";
+import type { ConjunctionResult } from "./utils/conjunction.js";
 
 export type Vec3 = [number, number, number];
 export type Vec3Tuple = Vec3;
@@ -57,9 +58,19 @@ export interface TimeFormatOptions {
   hijriMonths?: string[];
 }
 
+export type ConjunctionFn = (
+  anchorJd: number,
+  options?: {
+    sunAlgo?: AlgoConfig;
+    moonAlgo?: AlgoConfig;
+    [key: string]: unknown;
+  }
+) => ConjunctionResult;
+
 export type AlgoConfig = {
   name: string;
   bodies: BodyType[];
+  conjunction?: ConjunctionFn;
 } & Partial<Record<BodyType, BodyConfig>>;
 
 export type BodyType = "SUN" | "MOON" | "EARTH" | "BODY";

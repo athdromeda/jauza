@@ -44,6 +44,14 @@ export class Rukyat {
     if (!this.#sunAlgo || !this.#moonAlgo) {
       throw new Error("Rukyat: call with(algo) before conjunction()");
     }
+
+    if (this.#sunAlgo === this.#moonAlgo && this.#sunAlgo.conjunction) {
+      return this.#sunAlgo.conjunction(this.#anchor, {
+        sunAlgo: this.#sunAlgo,
+        moonAlgo: this.#moonAlgo,
+      });
+    }
+
     return findConjunction(this.#sunAlgo, this.#moonAlgo, this.#anchor);
   }
 }

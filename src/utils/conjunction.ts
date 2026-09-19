@@ -1,12 +1,12 @@
 import { normalizeAngle } from "../math/unit.js";
 import { Time } from "../modules/time.js";
+import { Earth } from "../modules/earth.js";
+import { Sun } from "../modules/sun.js";
+import { Moon } from "../modules/moon.js";
+import { DMS, HMS } from "../modules/angle.js";
+import { sin, cos, acos } from "../math/trigonometry.js";
 import { getDeltaT } from "./time.js";
-import type {
-  AlgoConfig,
-  AlgoOutput,
-  BodyConfig,
-  BodyType,
-} from "../types.js";
+import type { AlgoConfig, AlgoOutput, BodyConfig, BodyType } from "../types.js";
 import type { TimeScale } from "../contract.js";
 import { jdInScale, preferredScale } from "../frames/time-scale.js";
 import { brent } from "../math/numerics.js";
@@ -19,14 +19,9 @@ function resolveConfig(algo: AlgoConfig, type: BodyType): BodyConfig {
   return cfg;
 }
 
-const algoScale = (algo: AlgoConfig): TimeScale =>
-  preferredScale(algo, "UTC");
+const algoScale = (algo: AlgoConfig): TimeScale => preferredScale(algo, "UTC");
 
-function longitudeOf(
-  cfg: BodyConfig,
-  jd: number,
-  scale: TimeScale
-): number {
+function longitudeOf(cfg: BodyConfig, jd: number, scale: TimeScale): number {
   const callJd = jdInScale(jd, "UTC", scale);
   const out = cfg.formula({ jd: callJd }) as AlgoOutput;
   const lon = "lambda" in out ? out.lambda : out.l;
@@ -46,7 +41,9 @@ export function sunLongitude(sunAlgo: AlgoConfig, jd: number): number {
     throw new Error("Rukyat: sun algo is missing both SUN and EARTH");
   }
 
-  const out = cfg.formula({ jd: jdInScale(jd, "UTC", algoScale(sunAlgo)) }) as AlgoOutput;
+  const out = cfg.formula({
+    jd: jdInScale(jd, "UTC", algoScale(sunAlgo)),
+  }) as AlgoOutput;
   const lon = "lambda" in out ? out.lambda : out.l;
 
   return cfg.origin === "sun"
@@ -54,12 +51,166 @@ export function sunLongitude(sunAlgo: AlgoConfig, jd: number): number {
     : normalizeAngle(lon, 0, 360);
 }
 
+export type CrescentCondition = "Tilted North" | "Tilted South" | "Flat";
+
+export function getCrescentCondition(
+  moonAzimuth: number,
+  sunAzimuth: number
+): CrescentCondition {
+  const diff = moonAzimuth - sunAzimuth;
+  if (Math.abs(diff) < 1e-4) {
+    return "Flat";
+  }
+  return diff > 0 ? "Tilted North" : "Tilted South";
+}
+
+export type RukyatData = {
+  sunset: Time;
+  sunAzimuth: DMS;
+  moonAlt: DMS;
+  moonAzimuth: DMS;
+  moonPosition: DMS;
+  elongation: DMS;
+  crescentCondition: CrescentCondition;
+  lag: HMS;
+  moonset: Time;
+  moonsetAzimuth: DMS;
+  illumination: number;
+  age: HMS;
+};
+
+export type RukyatHilalData = RukyatData;
+
 export type ConjunctionResult = {
   jde: number;
   ut: number;
   moonLon: number;
   sunLon: number;
+  hilal?: RukyatData;
 };
+
+function findSunset(
+  sunAlgo: AlgoConfig,
+  observer: Earth,
+  conjunctionUt: number
+): number {
+  const targetAlt = -0.833 - 0.0347 * Math.sqrt(observer.h);
+  const tz = Math.round(observer.lng / 15);
+  const conjunctionTime = new Time(conjunctionUt, { timezone: tz });
+
+  const approxSunsetTime = new Time(
+    conjunctionTime.year,
+    conjunctionTime.month,
+    conjunctionTime.day,
+    18,
+    0,
+    0,
+    { timezone: tz }
+  );
+
+  const startJd = approxSunsetTime.jd - 4 / 24;
+  const endJd = approxSunsetTime.jd + 4 / 24;
+
+  const getSunAlt = (jd: number) => {
+    const obs = new Earth(observer.lat, observer.lng, observer.h)
+      .at(new Time(jd, { timezone: tz }))
+      .observe(Sun)
+      .with(sunAlgo);
+    return obs.alt - targetAlt;
+  };
+
+  return brent(getSunAlt, startJd, endJd);
+}
+
+function findMoonset(
+  moonAlgo: AlgoConfig,
+  observer: Earth,
+  sunsetJd: number
+): number {
+  const targetAlt = -0.833 - 0.0347 * Math.sqrt(observer.h);
+  const tz = Math.round(observer.lng / 15);
+
+  const startJd = sunsetJd - 4 / 24;
+  const endJd = sunsetJd + 4 / 24;
+
+  const getMoonAlt = (jd: number) => {
+    const obs = new Earth(observer.lat, observer.lng, observer.h)
+      .at(new Time(jd, { timezone: tz }))
+      .observe(Moon)
+      .with(moonAlgo);
+    return obs.alt - targetAlt;
+  };
+
+  return brent(getMoonAlt, startJd, endJd);
+}
+
+export function computeHilalDetails(
+  sunAlgo: AlgoConfig,
+  moonAlgo: AlgoConfig,
+  observer: Earth,
+  conjunctionRes: ConjunctionResult
+): RukyatData {
+  const sunsetJd = findSunset(sunAlgo, observer, conjunctionRes.ut);
+  const sunsetTime = new Time(sunsetJd);
+
+  const sunObsSunset = new Earth(observer.lat, observer.lng, observer.h)
+    .at(sunsetTime)
+    .observe(Sun)
+    .with(sunAlgo);
+  const sunAz = sunObsSunset.az;
+
+  const moonObsSunset = new Earth(observer.lat, observer.lng, observer.h)
+    .at(sunsetTime)
+    .observe(Moon)
+    .with(moonAlgo);
+  const moonAlt = moonObsSunset.alt;
+  const moonAz = moonObsSunset.az;
+
+  const moonPosDeg = Math.abs(moonAz - sunAz);
+
+  const moonEcl = moonObsSunset.geometric();
+  const sunEcl = sunObsSunset.geometric();
+  const moonLambda = moonEcl.lambda.decimal;
+  const moonBeta = moonEcl.beta.decimal;
+  const sunLambda = sunEcl.lambda.decimal;
+  const sunBeta = sunEcl.beta.decimal;
+
+  const cosE =
+    sin(moonBeta) * sin(sunBeta) +
+    cos(moonBeta) * cos(sunBeta) * cos(moonLambda - sunLambda);
+  const elongationDeg = acos(Math.min(1, Math.max(-1, cosE)));
+
+  const crescentCondition = getCrescentCondition(moonAz, sunAz);
+
+  const moonsetJd = findMoonset(moonAlgo, observer, sunsetJd);
+  const moonsetTime = new Time(moonsetJd);
+
+  const moonObsMoonset = new Earth(observer.lat, observer.lng, observer.h)
+    .at(moonsetTime)
+    .observe(Moon)
+    .with(moonAlgo);
+  const moonsetAz = moonObsMoonset.az;
+
+  const lagHours = (moonsetJd - sunsetJd) * 24;
+  const illumFraction = (1 + cos(elongationDeg)) / 2;
+  const illumPercent = illumFraction * 100;
+  const ageHours = (sunsetJd - conjunctionRes.ut) * 24;
+
+  return {
+    sunset: sunsetTime,
+    sunAzimuth: new DMS(sunAz),
+    moonAlt: new DMS(moonAlt),
+    moonAzimuth: new DMS(moonAz),
+    moonPosition: new DMS(moonPosDeg),
+    elongation: new DMS(elongationDeg),
+    crescentCondition,
+    lag: new HMS(lagHours),
+    moonset: moonsetTime,
+    moonsetAzimuth: new DMS(moonsetAz),
+    illumination: illumPercent,
+    age: new HMS(ageHours),
+  };
+}
 
 function resultAt(
   sunAlgo: AlgoConfig,

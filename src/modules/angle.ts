@@ -35,6 +35,14 @@ export class DMS {
     const { hours, minutes, seconds } = degToHms(this.decimal);
     return new HMS(hours, minutes, seconds);
   }
+
+  format() {
+    return formatDMS(this);
+  }
+
+  toString() {
+    return this.format();
+  }
 }
 
 export class HMS {
@@ -72,6 +80,46 @@ export class HMS {
   get dms() {
     return this.toDMS().decimal;
   }
+
+  format() {
+    return formatHMS(this);
+  }
+
+  toString() {
+    return this.format();
+  }
+}
+
+export function formatDMS(val: number | DMS): string {
+  const decimal = typeof val === "number" ? val : val.decimal;
+  const isNegative = decimal < 0;
+  const abs = Math.abs(decimal);
+  const deg = Math.floor(abs);
+  const minFloat = (abs - deg) * 60;
+  const min = Math.floor(minFloat);
+  const sec = (minFloat - min) * 60;
+
+  const degStr = String(deg).padStart(2, "0");
+  const minStr = String(min).padStart(2, "0");
+  const secStr = sec.toFixed(2).padStart(5, "0");
+
+  return `${isNegative ? "-" : ""}${degStr}° ${minStr}' ${secStr}"`;
+}
+
+export function formatHMS(val: number | HMS): string {
+  const decimal = typeof val === "number" ? val : val.decimal;
+  const isNegative = decimal < 0;
+  const abs = Math.abs(decimal);
+  const h = Math.floor(abs);
+  const mFloat = (abs - h) * 60;
+  const m = Math.floor(mFloat);
+  const s = (mFloat - m) * 60;
+
+  const hStr = String(h).padStart(2, "0");
+  const mStr = String(m).padStart(2, "0");
+  const sStr = s.toFixed(2).padStart(5, "0");
+
+  return `${isNegative ? "-" : ""}${hStr}h ${mStr}m ${sStr}s`;
 }
 
 export class Angle {
@@ -112,8 +160,7 @@ export class Angle {
   }
 
   toString() {
-    const { deg, min, sec } = this.dms;
-    return `${deg}° ${min}' ${sec}"`;
+    return formatDMS(this.#deg);
   }
 
   static fromDMS(deg: number, min: number, sec: number) {

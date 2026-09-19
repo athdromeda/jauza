@@ -1,4 +1,9 @@
-import { findConjunction, type ConjunctionResult } from "../utils/conjunction.js";
+import {
+  findConjunction,
+  computeHilalDetails,
+  type ConjunctionResult,
+  type RukyatData,
+} from "../utils/conjunction.js";
 import { HijriCalendar } from "./calendar/hijri.js";
 import type { AlgoConfig } from "../types.js";
 import type { Earth } from "./earth.js";
@@ -17,8 +22,6 @@ export class Rukyat {
   #observer: Earth | undefined;
   #sunAlgo: AlgoConfig | undefined;
   #moonAlgo: AlgoConfig | undefined;
-  #sunPositionFromEarth: Earth | undefined;
-  #moonPositionFromEarth: Earth | undefined;
 
   constructor(hijriYear: number, hijriMonth: number, options?: RukyatOptions) {
     this.#anchor = new HijriCalendar(hijriYear, hijriMonth, 1).jd;
@@ -45,13 +48,61 @@ export class Rukyat {
       throw new Error("Rukyat: call with(algo) before conjunction()");
     }
 
+    let baseResult: ConjunctionResult;
+
     if (this.#sunAlgo === this.#moonAlgo && this.#sunAlgo.conjunction) {
-      return this.#sunAlgo.conjunction(this.#anchor, {
+      baseResult = this.#sunAlgo.conjunction(this.#anchor, {
         sunAlgo: this.#sunAlgo,
         moonAlgo: this.#moonAlgo,
       });
+    } else {
+      baseResult = findConjunction(this.#sunAlgo, this.#moonAlgo, this.#anchor);
     }
 
-    return findConjunction(this.#sunAlgo, this.#moonAlgo, this.#anchor);
+    if (this.#observer) {
+      const hilal = computeHilalDetails(
+        this.#sunAlgo,
+        this.#moonAlgo,
+        this.#observer,
+        baseResult
+      );
+      return {
+        ...baseResult,
+        hilal,
+      };
+    }
+
+    return baseResult;
+  }
+
+  format(): string {
+    const res = this.conjunction();
+    if (!res.hilal) {
+      throw new Error("Rukyat: call at(observer) before format()");
+    }
+    return this.#formatHilal(res.hilal);
+  }
+
+  #formatHilal(hilal: RukyatData): string {
+    return [
+      `Sunset                              =  ${hilal.sunset.format(
+        "HH:mm:ss UTC"
+      )}`,
+      `Sun Azimuth                         =  ${hilal.sunAzimuth.format()}`,
+      `Moon Center Altitude                =  ${hilal.moonAlt.format()}`,
+      `Moon Azimuth                        =  ${hilal.moonAzimuth.format()}`,
+      `Moon Relative Position              =  ${hilal.moonPosition.format()}`,
+      `Geocentric Elongation               =  ${hilal.elongation.format()}`,
+      `Crescent Condition                  =  ${hilal.crescentCondition}`,
+      `Lag Duration                        =  ${hilal.lag.format()}`,
+      `Moonset                             =  ${hilal.moonset.format(
+        "HH:mm:ss UTC"
+      )}`,
+      `Moonset Azimuth                     =  ${hilal.moonsetAzimuth.format()}`,
+      `Moon Illumination                   =  ${hilal.illumination.toFixed(
+        2
+      )}%`,
+      `Moon Age                            =  ${hilal.age.format()}`,
+    ].join("\n");
   }
 }

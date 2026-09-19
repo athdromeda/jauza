@@ -26,6 +26,7 @@ describe("Rukyat.conjunction", () => {
     expect(sep).toBeLessThan(0.05);
     expect(Number.isFinite(r.jde)).toBe(true);
     expect(Number.isFinite(r.ut)).toBe(true);
+    expect(r.hilal).toBeUndefined();
   });
 
   it("throws if no algo was supplied", () => {

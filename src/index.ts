@@ -25,3 +25,4 @@ export function getEnv() {
 
 export * from "./math/index.js";
 export * from "./algos/index.js";
+export * from "./utils/conjunction.js";

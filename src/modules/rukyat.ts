@@ -133,7 +133,7 @@ export class Rukyat {
   visibility(params?: VisibilityParams): VisibilityResult {
     const res = this.conjunction();
     if (!res.hilal) {
-      throw new Error("Rukyat: call at(observer) before isVisible()");
+      throw new Error("Rukyat: call at(observer) before visibility()");
     }
 
     const alt = res.hilal.moonAlt.decimal;

@@ -6,7 +6,8 @@ export { GregorianCalendar } from "./modules/calendar/gregorian.js";
 export { HijriCalendar } from "./modules/calendar/hijri.js";
 export { Time } from "./modules/time.js";
 export { Angle } from "./modules/angle.js";
-export { getQibla } from "./utils/qibla.js";
+export { Qibla } from "./modules/qibla.js";
+export { getQibla, spherical, vincenty, type QiblaMethod } from "./utils/qibla.js";
 export { Rukyat } from "./modules/rukyat.js";
 export { Salat } from "./modules/salat.js";
 

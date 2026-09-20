@@ -1,0 +1,48 @@
+import { spherical, type QiblaMethod } from "../utils/qibla.js";
+
+type CoordinateArray = [number, number] | [number, number, number];
+
+export class Qibla {
+  lat: number;
+  lng: number;
+  #method: QiblaMethod = spherical;
+  #qibla: number | null = null;
+
+  constructor(lat: number | CoordinateArray, lng: number | CoordinateArray) {
+    if (Array.isArray(lat)) {
+      const isNegative = lat[0] < 0;
+      this.lat = Math.abs(lat[0]) + lat[1] / 60 + (lat[2] || 0) / 3600;
+      if (isNegative) {
+        this.lat = -this.lat;
+      }
+    } else {
+      this.lat = lat;
+    }
+    if (Array.isArray(lng)) {
+      const isNegative = lng[0] < 0;
+      this.lng = Math.abs(lng[0]) + lng[1] / 60 + (lng[2] || 0) / 3600;
+      if (isNegative) {
+        this.lng = -this.lng;
+      }
+    } else {
+      this.lng = lng;
+    }
+  }
+
+  with(method: QiblaMethod): this {
+    this.#method = method;
+    this.#qibla = null;
+    return this;
+  }
+
+  getQibla() {
+    this.#qibla = this.#method(this.lat, this.lng);
+  }
+
+  get qibla() {
+    if (this.#qibla === null) {
+      this.getQibla();
+    }
+    return this.#qibla;
+  }
+}

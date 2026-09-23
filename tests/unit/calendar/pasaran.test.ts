@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Time } from "../modules/time.js";
-import { getPasaranDay } from "./pasaran.js";
+import { Time } from "../../../src/modules/time.js";
+import { getPasaranDay } from "../../../src/utils/pasaran.js";
 
 describe("getPasaranDay", () => {
   it("should return Legi for 21 Juli 2012", () => {

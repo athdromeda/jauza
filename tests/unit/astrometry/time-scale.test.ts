@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { jdInScale, scaleShift, UnsupportedTimeScaleError } from "./time-scale.js";
-import { Time } from "../modules/time.js";
+import { jdInScale, scaleShift, UnsupportedTimeScaleError } from "../../../src/frames/time-scale.js";
+import { Time } from "../../../src/modules/time.js";
 
 describe("time scales", () => {
   it("jdInScale is identity on the same scale", () => {

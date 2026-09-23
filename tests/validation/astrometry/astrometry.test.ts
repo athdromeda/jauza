@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { eclipticToEquatorial, equatorialToEcliptic } from "./astrometry.js";
-import { DMS, HMS } from "../modules/angle.js";
+import { eclipticToEquatorial, equatorialToEcliptic } from "../../../src/math/astrometry.js";
+import { DMS, HMS } from "../../../src/modules/angle.js";
 
 describe("astrometry", () => {
   it("should convert ecliptic to equatorial", () => {

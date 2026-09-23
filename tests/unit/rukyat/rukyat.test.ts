@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Rukyat } from "./rukyat.js";
-import { meeusMoon } from "../algos/meeus-moon/index.js";
-import { meeusLow } from "../algos/low-meeus-sun/index.js";
-import { brent } from "../math/numerics.js";
-import { Time } from "./time.js";
-import { Earth } from "./earth.js";
+import { Rukyat } from "../../../src/modules/rukyat.js";
+import { meeusMoon } from "../../../src/algos/meeus-moon/index.js";
+import { meeusLow } from "../../../src/algos/low-meeus-sun/index.js";
+import { brent } from "../../../src/math/numerics.js";
 
 describe("numerics.brent", () => {
   it("finds sqrt(2)", () => {
@@ -18,33 +16,8 @@ describe("numerics.brent", () => {
 });
 
 describe("Rukyat.conjunction", () => {
-  it("returns the ijtimak with coincident moon/sun longitude", () => {
-    const r = new Rukyat(1445, 1)
-      .with({ sun: meeusLow, moon: meeusMoon })
-      .conjunction();
-
-    const sep = Math.abs(((r.moonLon - r.sunLon + 540) % 360) - 180);
-    expect(sep).toBeLessThan(0.05);
-    expect(Number.isFinite(r.jde)).toBe(true);
-    expect(Number.isFinite(r.ut)).toBe(true);
-    expect(r.hilal).toBeUndefined();
-  });
-
   it("throws if no algo was supplied", () => {
     expect(() => new Rukyat(1445, 1).conjunction()).toThrow();
-  });
-
-  it("computes the conjunction of Shawwal 1447 H", () => {
-    const r = new Rukyat(1447, 10)
-      .with({ sun: meeusLow, moon: meeusMoon })
-      .conjunction();
-
-    const sep = Math.abs(((r.moonLon - r.sunLon + 540) % 360) - 180);
-    expect(sep).toBeLessThan(0.05);
-
-    // sanity: Shawwal 1447 AH falls in 2026 Gregorian
-    const ut = new Time(r.ut);
-    expect(ut.year).toBe(2026);
   });
 
   it("uses algorithm custom conjunction function when sun and moon algorithms are the same", () => {

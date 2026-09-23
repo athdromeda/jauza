@@ -3,7 +3,7 @@ import {
   keyOf,
   coordinateState,
   type CoordinateStateKey,
-} from "../contract.js";
+} from "../../../src/contract.js";
 import {
   meanEclipticOfDate,
   meanEquatorialOfDate,
@@ -12,10 +12,10 @@ import {
   type Position,
   type Reference,
   type System,
-} from "../modules/position.js";
-import { nutationAngles } from "../transformations/nutation.js";
-import { cartToSph } from "./convert.js";
-import { EdgeRegistry, registerStandardEdges } from "./registry.js";
+} from "../../../src/modules/position.js";
+import { nutationAngles } from "../../../src/transformations/nutation.js";
+import { cartToSph } from "../../../src/frames/convert.js";
+import { EdgeRegistry, registerStandardEdges } from "../../../src/frames/registry.js";
 
 const sph = (
   system: System,

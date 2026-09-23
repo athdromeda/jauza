@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { coordinateState, keyOf, type CoordinateStateKey } from "./contract.js";
-import { meanEclipticOfDate, type Position } from "./modules/position.js";
+import { coordinateState, keyOf, type CoordinateStateKey } from "../../src/contract.js";
+import { meanEclipticOfDate, type Position } from "../../src/modules/position.js";
 
 const pos: Position = {
   representation: { kind: "spherical", lon: 10, lat: 0, r: 1 },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GregorianCalendar } from "./gregorian.js";
+import { GregorianCalendar } from "../../../src/modules/calendar/gregorian.js";
 
 describe("GregorianCalendar", () => {
   it("should return 2457447.9505 for 29 Februari 2016 pukul 10:48:43", () => {

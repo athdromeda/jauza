@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { meanObliquity } from "./obliquity.js";
-import { nutationAngles, trueObliquity } from "./nutation.js";
+import { meanObliquity } from "../../../src/transformations/obliquity.js";
+import { nutationAngles, trueObliquity } from "../../../src/transformations/nutation.js";
 
 describe("nutationAngles", () => {
   it("stays near the Meeus 23.a full-series values", () => {

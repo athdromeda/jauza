@@ -1,25 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { EdgeRegistry, registerStandardEdges } from "../frames/registry.js";
+import { EdgeRegistry, registerStandardEdges } from "../../../src/frames/registry.js";
 import {
   coordinateState,
   keyOf,
   type CoordinateStateKey,
-} from "../contract.js";
+} from "../../../src/contract.js";
 import {
   GraphResolver,
   UnsupportedTransformationError,
   DuplicateCorrectionError,
   applyCorrections,
-} from "./resolver.js";
+} from "../../../src/modules/resolver.js";
 import {
   meanEclipticOfDate,
   meanEquatorialOfDate,
   trueEclipticOfDate,
   type Position,
-} from "./position.js";
-import { nutationAngles } from "../transformations/nutation.js";
-import { cartToSph, sphToCart } from "../frames/convert.js";
-import { Vec3 } from "./vec3.js";
+} from "../../../src/modules/position.js";
+import { nutationAngles } from "../../../src/transformations/nutation.js";
+import { cartToSph, sphToCart } from "../../../src/frames/convert.js";
+import { Vec3 } from "../../../src/modules/vec3.js";
 
 const sph = (
   system: "ecliptic" | "equatorial",

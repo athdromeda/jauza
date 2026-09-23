@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { J2000_OBLIQUITY, julianCenturies, meanObliquity } from "./obliquity.js";
+import { J2000_OBLIQUITY, julianCenturies, meanObliquity } from "../../../src/transformations/obliquity.js";
 
 describe("meanObliquity", () => {
   it("returns the J2000 mean obliquity at T = 0", () => {

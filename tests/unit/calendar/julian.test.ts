@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { JulianCalendar } from "./julian.js";
+import { JulianCalendar } from "../../../src/modules/calendar/julian.js";
 
 describe("JulianCalendar", () => {
   it("should return 1949029.5 for 26 Februari 624 M", () => {

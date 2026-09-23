@@ -1,22 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
-import { Earth } from "./earth.js";
-import { Moon } from "./moon.js";
-import { Sun } from "./sun.js";
-import { Time } from "./time.js";
+import { Earth } from "../../../src/modules/earth.js";
+import { Moon } from "../../../src/modules/moon.js";
+import { Sun } from "../../../src/modules/sun.js";
+import { Time } from "../../../src/modules/time.js";
 import {
   eclipticJ2000,
   meanEclipticOfDate,
   meanEquatorialOfDate,
   trueEquatorialOfDate,
-} from "./position.js";
-import { meanObliquity, trueObliquity } from "../transformations/obliquity.js";
-import { nutationAngles } from "../transformations/nutation.js";
-import { jdInScale } from "../frames/time-scale.js";
-import { normalizeAngle } from "../math/unit.js";
-import { toFrame } from "../frames/convert.js";
-import { meeusMoon } from "../algos/meeus-moon/index.js";
-import { meeusLow } from "../algos/low-meeus-sun/index.js";
-import type { AlgoConfig } from "../types.js";
+} from "../../../src/modules/position.js";
+import { meanObliquity, trueObliquity } from "../../../src/transformations/obliquity.js";
+import { nutationAngles } from "../../../src/transformations/nutation.js";
+import { jdInScale } from "../../../src/frames/time-scale.js";
+import { normalizeAngle } from "../../../src/math/unit.js";
+import { toFrame } from "../../../src/frames/convert.js";
+import { meeusMoon } from "../../../src/algos/meeus-moon/index.js";
+import { meeusLow } from "../../../src/algos/low-meeus-sun/index.js";
+import type { AlgoConfig } from "../../../src/types.js";
 
 const j2000Algo: AlgoConfig = {
   name: "fixture-j2000",

@@ -7,8 +7,8 @@ import {
   trueEclipticOfDate,
   trueEquatorialOfDate,
   type Reference,
-} from "./position.js";
-import { referencesEqual } from "./transform.js";
+} from "../../../src/modules/position.js";
+import { referencesEqual } from "../../../src/modules/transform.js";
 
 describe("Reference constants", () => {
   it("renames eclipticOfDate -> meanEclipticOfDate", () => {

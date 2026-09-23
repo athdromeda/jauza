@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { HijriCalendar } from "./hijri.js";
-import { GregorianCalendar } from "./gregorian.js";
+import { HijriCalendar } from "../../../src/modules/calendar/hijri.js";
+import { GregorianCalendar } from "../../../src/modules/calendar/gregorian.js";
 
 describe("Hijri Convertions", () => {
   it("should convert 17 Ramadan 615 H to JD 2166272.5", () => {

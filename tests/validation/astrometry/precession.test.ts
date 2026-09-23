@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { asin, atan2, cos, sin } from "../math/trigonometry.js";
-import { Vec3 } from "../modules/vec3.js";
+import { asin, atan2, cos, sin } from "../../../src/math/trigonometry.js";
+import { Vec3 } from "../../../src/modules/vec3.js";
 import {
   precessEquatorialDateToJ2000,
   precessEquatorialJ2000ToDate,
-} from "./precession.js";
+} from "../../../src/transformations/precession.js";
 
 describe("precessEquatorialJ2000ToDate", () => {
   it("matches Meeus 21.b for theta Persei (to 2028)", () => {

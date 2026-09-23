@@ -5,8 +5,8 @@ import {
   meanEclipticOfDate,
   meanEquatorialOfDate,
   trueEclipticOfDate,
-} from "./position.js";
-import { Vec3 } from "./vec3.js";
+} from "../../../src/modules/position.js";
+import { Vec3 } from "../../../src/modules/vec3.js";
 import {
   assertSameReference,
   createResolver,
@@ -18,7 +18,7 @@ import {
   toOrigin,
   toPosition,
   toSpherical,
-} from "./transform.js";
+} from "../../../src/modules/transform.js";
 
 const cartPos = (vec3: Vec3) =>
   ({
@@ -202,7 +202,7 @@ describe("relative", () => {
   });
 });
 
-import type { BodyConfig } from "../types.js";
+import type { BodyConfig } from "../../../src/types.js";
 
 const eclipticOut: BodyConfig = {
   outputType: "ECLIPTIC",

@@ -67,10 +67,13 @@ export type ConjunctionFn = (
   }
 ) => ConjunctionResult;
 
+export type EotFn = (jd: number) => number;
+
 export type AlgoConfig = {
   name: string;
   bodies: BodyType[];
   conjunction?: ConjunctionFn;
+  eot?: EotFn;
 } & Partial<Record<BodyType, BodyConfig>>;
 
 export type BodyType = "SUN" | "MOON" | "EARTH" | "BODY";

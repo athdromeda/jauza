@@ -11,6 +11,8 @@ type SalatOptions = {
   fajrAlt?: number;
   asrFactor?: 1 | 2;
   dhuhaAlt?: number;
+  maghribAlt?: number;
+  sunriseAlt?: number;
 };
 
 export class Salat {
@@ -33,15 +35,17 @@ export class Salat {
   with(algo: AlgoConfig) {
     this.sunAlgo = algo;
 
-    const sun = this.#observer
-      .at(this.#time)
-      .observe(Sun)
-      .with(this.sunAlgo);
+    const sun = this.#observer.at(this.#time).observe(Sun).with(this.sunAlgo);
     this.sunPosition = sun;
     return this;
   }
 
   eot() {
+    const custom = this.sunAlgo?.eot;
+    if (custom) {
+      return custom(this.#time.jd) / 60;
+    }
+
     const timezone =
       this.#options.timezone ?? Math.round(this.#observer.lng / 15);
     const local = this.#time.jd - timezone / 24;
@@ -81,9 +85,12 @@ export class Salat {
     return this.istiwa() + this.ha(alt) / 15;
   }
 
-  maghrib() {
-    const alt = -0.833 - 0.0347 * Math.sqrt(this.#observer.h);
-    return this.istiwa() + this.ha(alt) / 15;
+  maghrib(alt?: number) {
+    const altitude =
+      alt ??
+      this.#options.maghribAlt ??
+      -0.833 - 0.0347 * Math.sqrt(this.#observer.h);
+    return this.istiwa() + this.ha(altitude) / 15;
   }
 
   isha(alt?: number) {
@@ -95,12 +102,15 @@ export class Salat {
   }
 
   imsak() {
-    return this.fajr() + 10 / 60;
+    return this.fajr() - 10 / 60;
   }
 
-  sunrise() {
-    const alt = -0.833 - 0.0347 * Math.sqrt(this.#observer.h);
-    return this.istiwa() - this.ha(alt) / 15;
+  sunrise(alt?: number) {
+    const altitude =
+      alt ??
+      this.#options.sunriseAlt ??
+      -0.833 - 0.0347 * Math.sqrt(this.#observer.h);
+    return this.istiwa() - this.ha(altitude) / 15;
   }
 
   dhuha(alt?: number) {

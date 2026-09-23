@@ -5,6 +5,7 @@ export {
   type OutputType,
   type AlgoInput,
   type AlgoOutput,
+  type EotFn,
   type GeocentricEcliptic,
   type HeliocentricEcliptic,
   ORIGIN_FOR,

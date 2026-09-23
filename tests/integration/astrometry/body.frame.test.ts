@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { Earth } from "../../../src/modules/earth.js";
-import { Moon } from "../../../src/modules/moon.js";
 import { Sun } from "../../../src/modules/sun.js";
 import { Time } from "../../../src/modules/time.js";
 import {
@@ -14,8 +13,6 @@ import { nutationAngles } from "../../../src/transformations/nutation.js";
 import { jdInScale } from "../../../src/frames/time-scale.js";
 import { normalizeAngle } from "../../../src/math/unit.js";
 import { toFrame } from "../../../src/frames/convert.js";
-import { meeusMoon } from "../../../src/algos/meeus-moon/index.js";
-import { meeusLow } from "../../../src/algos/low-meeus-sun/index.js";
 import type { AlgoConfig } from "../../../src/types.js";
 
 const j2000Algo: AlgoConfig = {
@@ -102,14 +99,14 @@ describe("Body with a J2000 algo", () => {
 
 describe("Body graph API", () => {
 it("epsilon is model-derived (mean geometric / true apparent) and no longer a mutable 23.5 default", () => {
-    const e = new Earth([0, 0], [0, 0], 0).at(new Time(1992, 4, 12, 0)).observe(Moon).with(meeusMoon);
+    const e = new Earth([0, 0], [0, 0], 0).at(new Time(1992, 4, 12, 0)).observe(Sun).with(j2000Algo);
     const graphJd = jdInScale(e.time.jd, e.time.scale, "TT");
     expect(Math.abs(e.geometric().epsilon - meanObliquity(graphJd))).toBeLessThan(1e-9);
     expect(Math.abs(e.epsilon - trueObliquity(graphJd))).toBeLessThan(1e-9);
   });
 
   it("apparent() adds dpsi to geometric lambda (sun annual aberration excluded here)", () => {
-    const e = new Earth([0, 0], [0, 0], 0).at(new Time(1992, 4, 12, 0)).observe(Moon).with(meeusMoon);
+    const e = new Earth([0, 0], [0, 0], 0).at(new Time(1992, 4, 12, 0)).observe(Sun).with(j2000Algo);
     const geo = e.geometric().lambda.decimal;
     const { dpsi } = nutationAngles(e.time.jd);
     const app = e.lambda.decimal;
@@ -117,7 +114,7 @@ it("epsilon is model-derived (mean geometric / true apparent) and no longer a mu
   });
 
   it("toEquatorial() resolves the stored position to equatorial (apparent true-of-date, geometric mean-of-date)", () => {
-    const e = new Earth([0, 0], [0, 0], 0).at(new Time(1992, 4, 12, 0)).observe(Sun).with(meeusLow).toEquatorial();
+    const e = new Earth([0, 0], [0, 0], 0).at(new Time(1992, 4, 12, 0)).observe(Sun).with(j2000Algo).toEquatorial();
     expect(e.position.key.system).toBe("equatorial");
     expect(e.position.key.reference).toEqual(trueEquatorialOfDate);
     expect(e.geometric().position.key.system).toBe("equatorial");

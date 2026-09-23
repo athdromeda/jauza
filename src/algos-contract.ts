@@ -9,7 +9,7 @@ export {
   type GeocentricEcliptic,
   type HeliocentricEcliptic,
   ORIGIN_FOR,
-} from "../types.js";
+} from "./types.js";
 export type {
   AlgorithmAdapter,
   ExtendedAlgorithmMetadata,
@@ -24,11 +24,11 @@ export type {
   ResolutionPlan,
   Provenance,
   TimeScale,
-} from "../contract.js";
-export { coordinateState, keyOf } from "../contract.js";
+} from "./contract.js";
+export { coordinateState, keyOf } from "./contract.js";
 export {
   findConjunction,
   moonLongitude,
   sunLongitude,
   type ConjunctionResult,
-} from "../utils/conjunction.js";
+} from "./utils/conjunction.js";

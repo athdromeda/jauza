@@ -1,8 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { Rukyat } from "../../../src/modules/rukyat.js";
-import { meeusMoon } from "../../../src/algos/meeus-moon/index.js";
-import { meeusLow } from "../../../src/algos/low-meeus-sun/index.js";
+import { HijriCalendar } from "../../../src/modules/calendar/hijri.js";
+import { meanEclipticOfDate } from "../../../src/modules/position.js";
 import { brent } from "../../../src/math/numerics.js";
+import type { AlgoConfig } from "../../../src/types.js";
+
+const sunStub: AlgoConfig = {
+  name: "fixture-sun",
+  bodies: ["SUN", "EARTH"],
+  SUN: {
+    outputType: "ECLIPTIC",
+    origin: "earth",
+    system: "ecliptic",
+    reference: meanEclipticOfDate,
+    formula: () => ({ lambda: 0, beta: 0, r: 1 }),
+  },
+};
+
+const moonStub = (anchorJd: number): AlgoConfig => ({
+  name: "fixture-moon",
+  bodies: ["MOON"],
+  MOON: {
+    outputType: "ECLIPTIC",
+    origin: "earth",
+    system: "ecliptic",
+    reference: meanEclipticOfDate,
+    // longitude crosses zero (the sun stub's longitude) exactly at the anchor,
+    // so findConjunction's grid hits the coincident point and converges.
+    formula: ({ jd }) => ({ lambda: 0.5 * (jd - anchorJd), beta: 0, r: 1 }),
+  },
+});
 
 describe("numerics.brent", () => {
   it("finds sqrt(2)", () => {
@@ -30,8 +57,8 @@ describe("Rukyat.conjunction", () => {
 
     let calledWithAnchor: number | undefined;
 
-    const mockAlgo = {
-      ...meeusMoon,
+    const mockAlgo: AlgoConfig = {
+      ...sunStub,
       name: "mock-custom-conjunction",
       conjunction: (anchorJd: number) => {
         calledWithAnchor = anchorJd;
@@ -47,8 +74,8 @@ describe("Rukyat.conjunction", () => {
   it("does NOT use custom conjunction function when sun and moon algorithms are different", () => {
     let customConjunctionCalled = false;
 
-    const mockAlgo = {
-      ...meeusMoon,
+    const mockAlgo: AlgoConfig = {
+      ...moonStub(2461118.55989),
       name: "mock-custom-conjunction",
       conjunction: () => {
         customConjunctionCalled = true;
@@ -57,7 +84,7 @@ describe("Rukyat.conjunction", () => {
     };
 
     const r = new Rukyat(1447, 10)
-      .with({ sun: meeusLow, moon: mockAlgo })
+      .with({ sun: sunStub, moon: mockAlgo })
       .conjunction();
 
     expect(customConjunctionCalled).toBe(false);
@@ -67,7 +94,8 @@ describe("Rukyat.conjunction", () => {
 
 describe("Rukyat.visibility", () => {
   it("throws if observer is not set", () => {
-    const r = new Rukyat(1447, 10).with({ sun: meeusLow, moon: meeusMoon });
+    const anchor = new HijriCalendar(1447, 10, 1).jd;
+    const r = new Rukyat(1447, 10).with({ sun: sunStub, moon: moonStub(anchor) });
     expect(() => r.visibility()).toThrow(
       "call at(observer) before visibility()"
     );

@@ -2,14 +2,27 @@ import { describe, it, expect } from "vitest";
 import { Salat } from "../../src/modules/salat.js";
 import { Time } from "../../src/modules/time.js";
 import { Earth } from "../../src/modules/earth.js";
-import { meeusLow } from "../../src/algos/low-meeus-sun/index.js";
+import { eclipticJ2000 } from "../../src/modules/position.js";
+import type { AlgoConfig } from "../../src/types.js";
+
+const sunStub: AlgoConfig = {
+  name: "fixture-sun",
+  bodies: ["SUN", "EARTH"],
+  EARTH: {
+    outputType: "ECLIPTIC",
+    origin: "sun",
+    system: "ecliptic",
+    reference: eclipticJ2000,
+    formula: () => ({ l: 0, b: 0, r: 1 }),
+  },
+};
 
 describe("Salat", () => {
   it("uses an algorithm-provided eot override (minutes)", () => {
     const jakarta = new Earth(-6.166667, 106.85, 50);
     const customEotMinutes = 15;
-    const mockAlgo = {
-      ...meeusLow,
+    const mockAlgo: AlgoConfig = {
+      ...sunStub,
       name: "mock-custom-eot",
       eot: (_jd: number) => customEotMinutes,
     };

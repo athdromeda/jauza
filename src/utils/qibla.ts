@@ -1,3 +1,4 @@
+import { KAABA_LAT, KAABA_LNG } from "../data/qibla.js";
 import { atan, atan2, cos, sin, tan } from "../math/trigonometry.js";
 import { normalizeAngle } from "../math/unit.js";
 
@@ -6,9 +7,6 @@ export interface QiblaOptions {
   kaabaLat?: number;
   kaabaLng?: number;
 }
-
-const KAABA_LNG = 39.82616111;
-const KAABA_LAT = 21.42250833;
 
 // vincenty constants
 const FLATTENING = 1 / 298.257223563;

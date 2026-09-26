@@ -11,6 +11,7 @@ import { Time as TimeClass } from "./modules/time.js";
 import { Angle as AngleClass } from "./modules/angle.js";
 import { Qibla as QiblaClass } from "./modules/qibla.js";
 import { Rukyat as RukyatClass } from "./modules/rukyat.js";
+import { RashdQibla as RashdQiblaClass } from "./modules/rashd-qibla.js";
 import { Salat as SalatClass } from "./modules/salat.js";
 
 export type Time = TimeClass;
@@ -46,6 +47,19 @@ export const Qibla = callable(QiblaClass);
 
 export type Rukyat = RukyatClass;
 export const Rukyat = callable(RukyatClass);
+
+export type RashdQibla = RashdQiblaClass<"GLOBAL" | "LOCAL">;
+
+export interface RashdQiblaCallable {
+  (): RashdQiblaClass<"GLOBAL">;
+  (year: number): RashdQiblaClass<"GLOBAL">;
+  (time: Time): RashdQiblaClass<"LOCAL">;
+  new (): RashdQiblaClass<"GLOBAL">;
+  new (year: number): RashdQiblaClass<"GLOBAL">;
+  new (time: Time): RashdQiblaClass<"LOCAL">;
+}
+
+export const RashdQibla = callable(RashdQiblaClass) as RashdQiblaCallable;
 
 export type Salat = SalatClass;
 export const Salat = callable(SalatClass);

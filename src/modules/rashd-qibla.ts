@@ -12,8 +12,10 @@ const SOLAR_NOON_UTC = (12 - KAABA_LNG / 15) / 24;
 const wrap = (x: number, half: number) =>
   ((((x + half) % (2 * half)) + 2 * half) % (2 * half)) - half;
 
-export class RashdQibla {
-  #mode: "GLOBAL" | "LOCAL";
+type RashdQiblaMode = "GLOBAL" | "LOCAL";
+
+export class RashdQibla<M extends RashdQiblaMode = RashdQiblaMode> {
+  #mode: RashdQiblaMode;
   #year: number | undefined;
   #anchor: Time | undefined;
   #sunAlgo: AlgoConfig | undefined;
@@ -32,12 +34,12 @@ export class RashdQibla {
     }
   }
 
-  with(algo: AlgoConfig): Time[] | this {
+  with(algo: AlgoConfig): M extends "GLOBAL" ? Time[] : this {
     this.#sunAlgo = algo;
     if (this.#mode === "GLOBAL") {
-      return this.#global();
+      return this.#global() as M extends "GLOBAL" ? Time[] : this;
     }
-    return this;
+    return this as M extends "GLOBAL" ? Time[] : this;
   }
 
   at(earth: Earth): Time[] {

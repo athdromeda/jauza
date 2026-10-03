@@ -1,7 +1,8 @@
 import type { DMS } from "./modules/angle.js";
 import type { Origin, Position, Reference, System } from "./modules/position.js";
 import type { TimeScale } from "./contract.js";
-import type { ConjunctionResult } from "./utils/conjunction.js";
+import type { ConjunctionResult, RukyatData } from "./utils/conjunction.js";
+import type { Earth } from "./modules/earth.js";
 
 export type Vec3 = [number, number, number];
 export type Vec3Tuple = Vec3;
@@ -69,10 +70,18 @@ export type ConjunctionFn = (
 
 export type EotFn = (jd: number) => number;
 
+export type HilalFn = (opts: {
+  observer: Earth;
+  sunAlgo?: AlgoConfig;
+  moonAlgo?: AlgoConfig;
+  conjunction: ConjunctionResult;
+}) => RukyatData;
+
 export type AlgoConfig = {
   name: string;
   bodies: BodyType[];
   conjunction?: ConjunctionFn;
+  hilal?: HilalFn;
   eot?: EotFn;
 } & Partial<Record<BodyType, BodyConfig>>;
 
@@ -92,9 +101,13 @@ export type BodyConfig = {
   reference: Reference;
   formula: (input: AlgoInput) => AlgoOutput;
   toCanonical?: (pos: Position, jd: number) => Position;
+  /** Units of the `r` (distance) component returned by `formula`. */
+  distanceUnit: DistanceUnit;
 };
 
 export type OutputType = "ECLIPTIC" | "EQUATORIAL";
+
+export type DistanceUnit = "km" | "au" | "earth-radii";
 
 export type AlgoInput = {
   jd: number;

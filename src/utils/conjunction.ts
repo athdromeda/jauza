@@ -10,6 +10,7 @@ import type { AlgoConfig, AlgoOutput, BodyConfig, BodyType } from "../types.js";
 import type { TimeScale } from "../contract.js";
 import { jdInScale, preferredScale } from "../frames/time-scale.js";
 import { brent } from "../math/numerics.js";
+import { semiDiameter } from "./apparent.js";
 
 function resolveConfig(algo: AlgoConfig, type: BodyType): BodyConfig {
   const cfg = algo[type];
@@ -61,7 +62,9 @@ export function getCrescentCondition(
   if (Math.abs(diff) < 1e-4) {
     return "Flat";
   }
-  return diff > 0 ? "Tilted North" : "Tilted South";
+  // The crescent tilts AWAY from the sun: moon south of the sun → the horns
+  // lean north ("miring ke utara"), moon north → lean south.
+  return diff < 0 ? "Tilted North" : "Tilted South";
 }
 
 export type RukyatData = {
@@ -77,6 +80,16 @@ export type RukyatData = {
   moonsetAzimuth: DMS;
   illumination: number;
   age: HMS;
+  /** mar'i upper-limb altitude (moonAlt + SD☾); populated by custom hilal fns. */
+  moonAltUpper?: DMS;
+  /** geometric center altitude (pre-parallax); populated by custom hilal fns. */
+  moonAltGeometric?: DMS;
+  /** parallax correction P = HP·cos(h); populated by custom hilal fns. */
+  moonAltParallax?: DMS;
+  /** refraction term; populated by custom hilal fns. */
+  moonAltRefraction?: DMS;
+  /** dip term (0.0293·√h); populated by custom hilal fns. */
+  moonAltDip?: DMS;
 };
 
 export type RukyatHilalData = RukyatData;
@@ -89,12 +102,19 @@ export type ConjunctionResult = {
   hilal?: RukyatData;
 };
 
+// Book's mar'i horizon: h = -(SD + 34′30″ + Dip), Dip = 0.0293·√h (h in metres).
+const HORIZON_REFRACTION_ALT = 34.5 / 60;
+const DIP_COEFFICIENT = 0.0293;
+
+function horizonTargetAltitude(sd: number, elevation: number): number {
+  return -(sd + HORIZON_REFRACTION_ALT + DIP_COEFFICIENT * Math.sqrt(elevation));
+}
+
 function findSunset(
   sunAlgo: AlgoConfig,
   observer: Earth,
   conjunctionUt: number
 ): number {
-  const targetAlt = -0.833 - 0.0347 * Math.sqrt(observer.h);
   const tz = Math.round(observer.lng / 15);
   const conjunctionTime = new Time(conjunctionUt, { timezone: tz });
 
@@ -116,7 +136,8 @@ function findSunset(
       .at(new Time(jd, { timezone: tz }))
       .observe(Sun)
       .with(sunAlgo);
-    return obs.alt - targetAlt;
+    const sd = semiDiameter("SUN", obs.geometric().rKm, "km");
+    return obs.alt - horizonTargetAltitude(sd, observer.h);
   };
 
   return brent(getSunAlt, startJd, endJd);
@@ -127,7 +148,6 @@ function findMoonset(
   observer: Earth,
   sunsetJd: number
 ): number {
-  const targetAlt = -0.833 - 0.0347 * Math.sqrt(observer.h);
   const tz = Math.round(observer.lng / 15);
 
   const startJd = sunsetJd - 4 / 24;
@@ -138,7 +158,8 @@ function findMoonset(
       .at(new Time(jd, { timezone: tz }))
       .observe(Moon)
       .with(moonAlgo);
-    return obs.alt - targetAlt;
+    const sd = semiDiameter("MOON", obs.geometric().rKm, "km");
+    return obs.alt - horizonTargetAltitude(sd, observer.h);
   };
 
   return brent(getMoonAlt, startJd, endJd);
@@ -192,7 +213,7 @@ export function computeHilalDetails(
   const moonsetAz = moonObsMoonset.az;
 
   const lagHours = (moonsetJd - sunsetJd) * 24;
-  const illumFraction = (1 + cos(elongationDeg)) / 2;
+  const illumFraction = (1 - cos(elongationDeg)) / 2;
   const illumPercent = illumFraction * 100;
   const ageHours = (sunsetJd - conjunctionRes.ut) * 24;
 

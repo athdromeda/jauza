@@ -14,6 +14,7 @@ const sunStub: AlgoConfig = {
     system: "ecliptic",
     reference: eclipticJ2000,
     formula: () => ({ l: 0, b: 0, r: 1 }),
+    distanceUnit: "au",
   },
 };
 

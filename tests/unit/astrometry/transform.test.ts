@@ -210,6 +210,7 @@ const eclipticOut: BodyConfig = {
   system: "ecliptic",
   reference: meanEclipticOfDate,
   formula: () => ({ l: 10, b: 0, r: 1 }),
+  distanceUnit: "au",
 };
 
 describe("toPosition", () => {

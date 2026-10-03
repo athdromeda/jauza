@@ -30,6 +30,7 @@ const lowPrecSun: AlgoConfig = {
       const lambda = trueLong - 0.00569 - 0.00478 * sin(omega);
       return { l: lambda + 180, b: 0, r: 1 };
     },
+    distanceUnit: "au",
   },
 };
 

@@ -74,8 +74,9 @@ export class Rukyat {
 
     let baseResult: ConjunctionResult;
 
-    if (this.#sunAlgo === this.#moonAlgo && this.#sunAlgo.conjunction) {
-      baseResult = this.#sunAlgo.conjunction(this.#anchor, {
+    const custom = this.#sunAlgo.conjunction;
+    if (custom && custom === this.#moonAlgo.conjunction) {
+      baseResult = custom(this.#anchor, {
         sunAlgo: this.#sunAlgo,
         moonAlgo: this.#moonAlgo,
       });
@@ -84,12 +85,21 @@ export class Rukyat {
     }
 
     if (this.#observer) {
-      const hilal = computeHilalDetails(
-        this.#sunAlgo,
-        this.#moonAlgo,
-        this.#observer,
-        baseResult
-      );
+      const hilalFn = this.#sunAlgo.hilal;
+      const hilal =
+        hilalFn && hilalFn === this.#moonAlgo.hilal
+          ? hilalFn({
+              observer: this.#observer,
+              sunAlgo: this.#sunAlgo,
+              moonAlgo: this.#moonAlgo,
+              conjunction: baseResult,
+            })
+          : computeHilalDetails(
+              this.#sunAlgo,
+              this.#moonAlgo,
+              this.#observer,
+              baseResult
+            );
       return {
         ...baseResult,
         hilal,

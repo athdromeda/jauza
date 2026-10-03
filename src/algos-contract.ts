@@ -6,6 +6,7 @@ export {
   type AlgoInput,
   type AlgoOutput,
   type EotFn,
+  type HilalFn,
   type GeocentricEcliptic,
   type HeliocentricEcliptic,
   ORIGIN_FOR,

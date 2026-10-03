@@ -3,7 +3,11 @@ import { Rukyat } from "../../../src/modules/rukyat.js";
 import { HijriCalendar } from "../../../src/modules/calendar/hijri.js";
 import { meanEclipticOfDate } from "../../../src/modules/position.js";
 import { brent } from "../../../src/math/numerics.js";
-import type { AlgoConfig } from "../../../src/types.js";
+import { Earth } from "../../../src/modules/earth.js";
+import { Time } from "../../../src/modules/time.js";
+import { DMS, HMS } from "../../../src/modules/angle.js";
+import type { AlgoConfig, HilalFn } from "../../../src/types.js";
+import type { RukyatData } from "../../../src/utils/conjunction.js";
 
 const sunStub: AlgoConfig = {
   name: "fixture-sun",
@@ -14,6 +18,7 @@ const sunStub: AlgoConfig = {
     system: "ecliptic",
     reference: meanEclipticOfDate,
     formula: () => ({ lambda: 0, beta: 0, r: 1 }),
+    distanceUnit: "au",
   },
 };
 
@@ -28,8 +33,27 @@ const moonStub = (anchorJd: number): AlgoConfig => ({
     // longitude crosses zero (the sun stub's longitude) exactly at the anchor,
     // so findConjunction's grid hits the coincident point and converges.
     formula: ({ jd }) => ({ lambda: 0.5 * (jd - anchorJd), beta: 0, r: 1 }),
+    distanceUnit: "au",
   },
 });
+
+const markerHilalData = (): RukyatData => {
+  const t = new Time(2461118.6);
+  return {
+    sunset: t,
+    sunAzimuth: new DMS(270),
+    moonAlt: new DMS(4),
+    moonAzimuth: new DMS(265),
+    moonPosition: new DMS(5),
+    elongation: new DMS(6),
+    crescentCondition: "Tilted North",
+    lag: new HMS(1.25),
+    moonset: t,
+    moonsetAzimuth: new DMS(263),
+    illumination: 0.5,
+    age: new HMS(10),
+  };
+};
 
 describe("numerics.brent", () => {
   it("finds sqrt(2)", () => {
@@ -89,6 +113,77 @@ describe("Rukyat.conjunction", () => {
 
     expect(customConjunctionCalled).toBe(false);
     expect(r.jde).toBeGreaterThan(0);
+  });
+
+  it("uses custom conjunction when sun and moon are separate objects sharing the same conjunction", () => {
+    let calledWithAnchor: number | undefined;
+
+    const conjunction = (anchorJd: number) => {
+      calledWithAnchor = anchorJd;
+      return {
+        jde: 2461118.55989,
+        ut: 2461118.55902,
+        moonLon: 358.4633,
+        sunLon: 358.4633,
+      };
+    };
+
+    const sun = { ...sunStub, name: "shared-custom", conjunction };
+    const moon = { ...moonStub(2461118.55989), name: "shared-custom", conjunction };
+
+    const r = new Rukyat(1447, 10).with({ sun, moon }).conjunction();
+
+    expect(r).toEqual({
+      jde: 2461118.55989,
+      ut: 2461118.55902,
+      moonLon: 358.4633,
+      sunLon: 358.4633,
+    });
+    expect(calledWithAnchor).toBeDefined();
+  });
+
+  it("uses custom hilal when sun and moon share the same hilal implementation", () => {
+    let called = false;
+    let receivedJde: number | undefined;
+
+    const hilal: HilalFn = (opts) => {
+      called = true;
+      receivedJde = opts.conjunction.jde;
+      return markerHilalData();
+    };
+
+    const sun = { ...sunStub, name: "shared-hilal", hilal };
+    const moon = { ...moonStub(2461118.55989), name: "shared-hilal", hilal };
+
+    const r = new Rukyat(1447, 10)
+      .with({ sun, moon })
+      .at(new Earth(-6, 106, 0))
+      .conjunction();
+
+    expect(called).toBe(true);
+    expect(r.hilal!.lag.decimal).toBe(1.25);
+    expect(receivedJde).toBe(r.jde);
+  });
+
+  it("does NOT use custom hilal when only the sun defines it", () => {
+    let customHilalCalled = false;
+
+    const sun: AlgoConfig = {
+      ...sunStub,
+      name: "one-sided-hilal",
+      hilal: () => {
+        customHilalCalled = true;
+        return markerHilalData();
+      },
+    };
+
+    const r = new Rukyat(1447, 10)
+      .with({ sun, moon: moonStub(2461118.55989) })
+      .at(new Earth(-6, 106, 0))
+      .conjunction();
+
+    expect(customHilalCalled).toBe(false);
+    expect(r.hilal).toBeDefined();
   });
 });
 

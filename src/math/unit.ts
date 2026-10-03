@@ -31,3 +31,21 @@ export const normalizeHour = (hour: number) => {
   }
   return hour % 24;
 };
+
+export const AU_KM = 149597870.7;
+export const EARTH_RADIUS_KM = 6378.14;
+
+/** Convert a distance to canonical kilometres per `unit`; unknown units pass through. */
+export const toKm = (
+  r: number,
+  unit: "km" | "au" | "earth-radii" | undefined
+): number => {
+  switch (unit) {
+    case "au":
+      return r * AU_KM;
+    case "earth-radii":
+      return r * EARTH_RADIUS_KM;
+    default:
+      return r;
+  }
+};

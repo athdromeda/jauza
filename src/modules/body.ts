@@ -11,9 +11,10 @@ import {
   type AlgoConfig,
   type AlgoOutput,
   type BodyType,
+  type DistanceUnit,
   ORIGIN_FOR,
 } from "../types.js";
-import { normalizeAngle } from "../math/unit.js";
+import { normalizeAngle, toKm } from "../math/unit.js";
 import {
   applyCorrections,
   edgeLabel,
@@ -56,6 +57,8 @@ export type GeometricView = {
   readonly lambda: DMS;
   readonly beta: DMS;
   readonly r: number;
+  /** Geocentric distance, always in kilometres (canonical, unit-independent). */
+  readonly rKm: number;
   readonly ecliptic: {
     readonly l: DMS;
     readonly b: DMS;
@@ -81,6 +84,11 @@ export abstract class Body {
   #geometricState: CoordinateState<Vec3> | null = null;
   #apparentState: CoordinateState<Vec3> | null = null;
   #dirty = true;
+  /** Unit of the current geometric `r`, per the active algo's config. */
+  #rUnit: DistanceUnit | undefined;
+  /** Whether this body's own formula is an origin marker (`r === 0`), meaning
+   * the observed distance magnitude comes from the *other* body's formula. */
+  #sourceOriginMarker = false;
 
   constructor(time: Time, type: BodyType) {
     this.type = type;
@@ -107,6 +115,11 @@ export abstract class Body {
       system: this.resolver.system,
       reference: this.resolver.reference,
     };
+  }
+
+  /** Declared unit of the current geometric `r`, from the active algo config. */
+  get distanceUnit(): DistanceUnit | undefined {
+    return this.#rUnit;
   }
 
   get position(): CoordinateState<Vec3> {
@@ -136,6 +149,9 @@ export abstract class Body {
       get r() {
         return body.#readEcliptic(s, meanEclipticOfDate).r;
       },
+      get rKm() {
+        return body.#readEcliptic(s, meanEclipticOfDate).r;
+      },
       get ecliptic() {
         return body.#readEcliptic(s, meanEclipticOfDate);
       },
@@ -151,10 +167,25 @@ export abstract class Body {
     };
   }
 
+  /**
+   * Observe a body from this observer. Attaches `BodyClass` as the target and
+   * returns `this` — the shared observer instance. Each call re-targets the
+   * instance, so previously returned handles (e.g. from an earlier `observe`)
+   * silently read the latest target. To observe several bodies, create a fresh
+   * observer per body.
+   */
   observe(BodyClass: new (time: Time) => Body) {
     const target = new BodyClass(this.time);
     if (this.algo) target.with(this.algo);
     this.target = target.source;
+    // The observed distance magnitude comes from the *target's* formula unless
+    // that formula is an origin marker (r=0), in which case it comes from the
+    // observer's own formula. Convert using the config that produced the value.
+    const observerUnit = this.algo?.[this.type]?.distanceUnit;
+    const targetUnit = target.distanceUnit;
+    this.#rUnit = target.#sourceOriginMarker
+      ? observerUnit ?? targetUnit
+      : targetUnit ?? observerUnit;
     return this.#refresh();
   }
 
@@ -209,11 +240,13 @@ export abstract class Body {
 
   with(algo: AlgoConfig) {
     this.algo = algo as AlgorithmAdapter;
+    this.#rUnit = algo[this.type]?.distanceUnit;
     const jd = feedJd(this.time, this.algo);
     this.resolver = buildResolver(algo, jd);
     const cfg = algo[this.type];
     if (cfg) {
       const raw = cfg.formula({ jd }) as AlgoOutput;
+      this.#sourceOriginMarker = raw.r === 0;
       this.source = canonicalize(
         toPosition(raw, cfg),
         cfg,
@@ -283,7 +316,7 @@ export abstract class Body {
     return {
       l: new DMS(s.representation.lon),
       b: new DMS(s.representation.lat),
-      r: s.representation.r,
+      r: toKm(s.representation.r, this.#rUnit),
       system: pos.system,
       reference: pos.reference,
     };
@@ -304,12 +337,12 @@ export abstract class Body {
 
   #readRA(state: CoordinateState<Vec3>, reference: Reference): DMS {
     const s = toSpherical(this.#equatorialOf(state, reference).position);
-    return new DMS(s.representation.lon);
+    return new DMS(normalizeAngle(s.representation.lon, 0, 360));
   }
 
   #readDec(state: CoordinateState<Vec3>, reference: Reference): DMS {
     const s = toSpherical(this.#equatorialOf(state, reference).position);
-    return new DMS(s.representation.lat);
+    return new DMS(normalizeAngle(s.representation.lat, -90, 90));
   }
 
   get ecliptic() {

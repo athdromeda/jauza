@@ -24,6 +24,7 @@ const j2000Algo: AlgoConfig = {
     system: "ecliptic",
     reference: eclipticJ2000,
     formula: () => ({ l: 0, b: 0, r: 0 }),
+    distanceUnit: "au",
   },
   EARTH: {
     outputType: "ECLIPTIC",
@@ -31,6 +32,7 @@ const j2000Algo: AlgoConfig = {
     system: "ecliptic",
     reference: eclipticJ2000,
     formula: () => ({ l: 100, b: 0, r: 1 }),
+    distanceUnit: "au",
   },
 };
 

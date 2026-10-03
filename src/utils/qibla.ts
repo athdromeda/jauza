@@ -1,5 +1,5 @@
 import { KAABA_LAT, KAABA_LNG } from "../data/qibla.js";
-import { atan, atan2, cos, sin, tan } from "../math/trigonometry.js";
+import { acos, atan, atan2, cos, sin, tan } from "../math/trigonometry.js";
 import { normalizeAngle } from "../math/unit.js";
 
 export interface QiblaOptions {
@@ -21,12 +21,37 @@ export type QiblaMethod = (
   kaabaLng?: number
 ) => number;
 
+const centralAngleDeg = (
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number => {
+  const deltaLng = normalizeAngle(lng2 - lng1, -180, 180);
+  const cosDist =
+  sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(deltaLng);
+  return acos(Math.min(1, Math.max(-1, cosDist)));
+};
+
+const isDegenerate = (
+  lat: number,
+  lng: number,
+  kaabaLat: number,
+  kaabaLng: number
+): boolean => {
+  const DEGENERATE_EPS = 1e-9;
+  const angle = centralAngleDeg(lat, lng, kaabaLat, kaabaLng);
+  return angle < DEGENERATE_EPS || Math.abs(angle - 180) < DEGENERATE_EPS;
+};
+
 export const spherical: QiblaMethod = (
   lat: number,
   lng: number,
   kaabaLat: number = KAABA_LAT,
   kaabaLng: number = KAABA_LNG
 ) => {
+  // returns NaN for cases: observer on Kakbah itself, and antipode of Kakbah
+  if (isDegenerate(lat, lng, kaabaLat, kaabaLng)) return NaN;
   const deltaLng = kaabaLng - lng;
   const numerator = sin(deltaLng);
   const denominator = cos(lat) * tan(kaabaLat) - sin(lat) * cos(deltaLng);
@@ -39,6 +64,8 @@ export const vincenty: QiblaMethod = (
   kaabaLat: number = KAABA_LAT,
   kaabaLng: number = KAABA_LNG
 ) => {
+  // returns NaN for cases: observer on Kakbah itself, and antipode of Kakbah
+  if (isDegenerate(lat, lng, kaabaLat, kaabaLng)) return NaN;
   const phi1 = lat;
   const phi2 = kaabaLat;
   const L = kaabaLng - lng;

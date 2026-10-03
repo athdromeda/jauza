@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { Qibla } from "../../src/modules/qibla.js";
 import { spherical, vincenty } from "../../src/utils/qibla.js";
 import { getQibla } from "../../src/utils/qibla.js";
+import { KAABA_LAT, KAABA_LNG } from "../../src/data/qibla.js";
 
 describe("Qibla direction", () => {
   test("should use the spherical method by default for Masjid Istiqlal", () => {
@@ -93,5 +94,43 @@ describe("Get Qibla Direction with custom kaaba", () => {
   test("SPHERICAL should honor custom kaaba coordinates", () => {
     const qibla = getQibla(0, 0, { kaabaLat: 0, kaabaLng: 90 });
     expect(qibla).toBeCloseTo(90);
+  });
+});
+
+describe("Qibla degenerate cases", () => {
+  test("spherical returns NaN at the antipode of the Kaaba", () => {
+    expect(Number.isNaN(spherical(-KAABA_LAT, KAABA_LNG + 180))).toBe(true);
+  });
+
+  test("spherical returns NaN at the Kaaba itself", () => {
+    expect(Number.isNaN(spherical(KAABA_LAT, KAABA_LNG))).toBe(true);
+  });
+
+  test("vincenty returns NaN at the antipode of the Kaaba", () => {
+    expect(Number.isNaN(vincenty(-KAABA_LAT, KAABA_LNG + 180))).toBe(true);
+  });
+
+  test("vincenty returns NaN at the Kaaba itself", () => {
+    expect(Number.isNaN(vincenty(KAABA_LAT, KAABA_LNG))).toBe(true);
+  });
+
+  test("getQibla returns NaN at the antipode of the Kaaba", () => {
+    expect(Number.isNaN(getQibla(-KAABA_LAT, KAABA_LNG + 180))).toBe(true);
+  });
+
+  test("custom kaaba: observer at its antipode returns NaN", () => {
+    expect(Number.isNaN(spherical(0, -90, 0, 90))).toBe(true);
+  });
+
+  test("near-antipode still returns a valid bearing", () => {
+    const lat = -KAABA_LAT + 0.0001;
+    const lng = KAABA_LNG + 180;
+    expect(Number.isNaN(spherical(lat, lng))).toBe(false);
+    expect(Number.isNaN(vincenty(lat, lng))).toBe(false);
+  });
+
+  test("regression: 180deg longitude difference is a valid bearing", () => {
+    expect(spherical(0, KAABA_LNG + 180)).toBeCloseTo(0, 6);
+    expect(vincenty(0, KAABA_LNG + 180)).toBeCloseTo(0, 6);
   });
 });

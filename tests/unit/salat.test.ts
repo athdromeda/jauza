@@ -19,22 +19,23 @@ const sunStub: AlgoConfig = {
 };
 
 describe("Salat", () => {
-  it("uses an algorithm-provided eot override (minutes)", () => {
+  it("uses an algorithm-provided eot override (seconds)", () => {
     const jakarta = new Earth(-6.166667, 106.85, 50);
-    const customEotMinutes = 15;
+    const customEotSeconds = 15;
     const mockAlgo: AlgoConfig = {
       ...sunStub,
       name: "mock-custom-eot",
-      eot: (_jd: number) => customEotMinutes,
+      eot: (_jd: number) => customEotSeconds,
     };
 
     const salat = new Salat(new Time(2009, 6, 12, 12), { timezone: 7 })
       .at(jakarta)
       .with(mockAlgo);
 
-    expect(salat.eot()).toBeCloseTo(customEotMinutes / 60, 10);
+    // eot() reports minutes; istiwa() applies minutes/60 → hours.
+    expect(salat.eot()).toBeCloseTo(customEotSeconds / 60, 10);
     expect(salat.istiwa()).toBeCloseTo(
-      12 + 7 - 106.85 / 15 - customEotMinutes / 60 / 60,
+      12 + 7 - 106.85 / 15 - customEotSeconds / 60 / 60,
       6
     );
   });

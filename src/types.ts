@@ -74,7 +74,7 @@ export type ConjunctionFn = (
   }
 ) => ConjunctionResult;
 
-export type EotFn = (jd: number) => number;
+export type EotFn = (jd: number) => number; // output in second
 
 export type HilalFn = (opts: {
   observer: Earth;

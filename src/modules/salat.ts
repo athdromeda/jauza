@@ -27,6 +27,10 @@ export class Salat {
     this.#options = options;
   }
 
+  get #timezone() {
+    return this.#options.timezone ?? Math.round(this.#observer.lng / 15);
+  }
+
   at(earth: Earth) {
     this.#observer = earth;
     return this;
@@ -46,9 +50,7 @@ export class Salat {
       return custom(this.#time.jd) / 60;
     }
 
-    const timezone =
-      this.#options.timezone ?? Math.round(this.#observer.lng / 15);
-    const local = this.#time.jd - timezone / 24;
+    const local = this.#time.jd - this.#timezone / 24;
     const T = (local - 2451545) / 36525;
     const L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T * T;
     const eot =
@@ -59,15 +61,12 @@ export class Salat {
       (74 + 10 * T) * sin(3 * L0) +
       (320 - 4 * T) * cos(3 * L0) -
       212 * sin(4 * L0);
-    // console.table({ jd: this.#time.jd, T, L0, eot });
 
     return eot / 1000;
   }
 
   istiwa() {
-    const timezone =
-      this.#options.timezone ?? Math.round(this.#observer.lng / 15);
-    return 12 + timezone - this.#observer.lng / 15 - this.eot() / 60;
+    return 12 + this.#timezone - this.#observer.lng / 15 - this.eot() / 60;
   }
 
   dhuhr() {
@@ -129,7 +128,10 @@ export class Salat {
   }
 
   asTime(hour: number) {
-    return new Time(this.#time.year, this.#time.month, this.#time.day, hour);
+    const local = new Time(this.#time.jd, { timezone: this.#timezone });
+    return new Time(local.year, local.month, local.day, hour, {
+      timezone: this.#timezone,
+    });
   }
 
   info() {

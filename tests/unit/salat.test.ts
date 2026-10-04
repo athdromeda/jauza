@@ -38,4 +38,43 @@ describe("Salat", () => {
       6
     );
   });
+
+  it("asTime returns a Time in the same timezone as the hour getters", () => {
+    const jakarta = new Earth(-6.166667, 106.85, 50);
+    const salat = new Salat(new Time(2009, 6, 12, 12), { timezone: 7 })
+      .at(jakarta)
+      .with(sunStub);
+
+    const maghrib = salat.maghrib();
+    const t = salat.asTime(maghrib);
+
+    expect(t.timezone).toBe(7);
+    expect(t.jd).toBeCloseTo(
+      new Time(2009, 6, 12, maghrib, { timezone: 7 }).jd,
+      9
+    );
+    expect(t.info).toMatchObject({
+      year: 2009,
+      month: 6,
+      day: 12,
+      timezone: 7,
+    });
+  });
+
+  it("asTime uses the local calendar date, not the UTC date", () => {
+    const jakarta = new Earth(-6.166667, 106.85, 50);
+    const salat = new Salat(new Time(2009, 6, 12, 22), { timezone: 7 })
+      .at(jakarta)
+      .with(sunStub);
+
+    const t = salat.asTime(5);
+
+    expect(t.info).toMatchObject({
+      year: 2009,
+      month: 6,
+      day: 13,
+      hour: 5,
+      timezone: 7,
+    });
+  });
 });

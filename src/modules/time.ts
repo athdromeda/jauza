@@ -61,7 +61,7 @@ export class Time {
       this.#scale = opts?.scale ?? "UTC";
       this.#timezone = opts?.timezone ?? 0;
       this.#calendar = this.resolveCalendar(opts);
-      this.#jd = this.civilToJDUt(
+      this.#jd = this.#jdFromGregorianFields(
         jdOrDate.getUTCFullYear(),
         jdOrDate.getUTCMonth() + 1,
         jdOrDate.getUTCDate(),
@@ -114,6 +114,35 @@ export class Time {
 
   get jd() {
     return this.#jd;
+  }
+
+  /**
+   * JD of a civil date whose fields are Gregorian (as produced by Date#getUTC*).
+   * A JS Date is a proleptic-Gregorian instant, so this conversion is
+   * calendar-independent and must NOT dispatch to a subclass override (which
+   * would reinterpret Gregorian fields as Julian or Hijri dates).
+   */
+  #jdFromGregorianFields(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number
+  ): number {
+    const M = month >= 3 ? month : month + 12;
+    const Y = month >= 3 ? year : year - 1;
+    const A = Math.floor(Y / 100);
+    const B = 2 - A + Math.floor(A / 4);
+
+    return (
+      1720994.5 +
+      Math.floor(365.25 * Y) +
+      Math.floor(30.6001 * (M + 1)) +
+      B +
+      day +
+      (hour + minute / 60 + second / 3600) / 24
+    );
   }
 
   protected civilToJDUt(
@@ -254,7 +283,11 @@ export class Time {
 
   inScale(scale: TimeScale): Time {
     if (scale === this.#scale) return this;
-    return new Time(jdInScale(this.#jd, this.#scale, scale), {
+    const Ctor = this.constructor as new (
+      jd: number,
+      options?: TimeOptions
+    ) => Time;
+    return new Ctor(jdInScale(this.#jd, this.#scale, scale), {
       timezone: this.#timezone,
       calendar: this.#calendar,
       scale,
@@ -267,7 +300,13 @@ export class Time {
   }
 
   protected resolveCalendar(options?: TimeOptions): CalendarSystem {
-    return options?.calendar || CalendarSystem.Gregorian;
+    const calendar = options?.calendar ?? CalendarSystem.Gregorian;
+    if (calendar === CalendarSystem.Hijri) {
+      throw new Error(
+        'Time: "calendar: HIJRI" is only supported via HijriCalendar (the base Time class cannot render Hijri dates)'
+      );
+    }
+    return calendar;
   }
 
   private formatString(pattern: string, locale?: string, hijriMonths?: string[]): string {

@@ -1,8 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { computeHilalDetails } from "../../../src/utils/conjunction.js";
+import {
+  computeHilalDetails,
+  moonLongitude,
+  sunLongitude,
+} from "../../../src/utils/conjunction.js";
 import { Earth } from "../../../src/modules/earth.js";
 import { Sun } from "../../../src/modules/sun.js";
-import { meanEclipticOfDate } from "../../../src/modules/position.js";
+import {
+  meanEclipticOfDate,
+  trueEclipticOfDate,
+} from "../../../src/modules/position.js";
 import type { AlgoConfig } from "../../../src/types.js";
 
 const sunStub: AlgoConfig = {
@@ -60,5 +67,57 @@ describe("computeHilalDetails", () => {
     // so accept ~0.005°. This still separates the book's target (-0.8416°) from
     // the old -0.833 - 0.0347·√h convention (-0.833°, Δ ≈ 0.0086°).
     expect(sun.alt).toBeCloseTo(expectedTarget, 2);
+  });
+});
+
+describe("longitude readers", () => {
+  it("uses the primary ecliptic coordinates from multi-coordinate output", () => {
+    const algo: AlgoConfig = {
+      name: "multi-conjunction-fixture",
+      bodies: ["SUN", "MOON"],
+      SUN: {
+        outputType: "MULTI_SPHERICAL",
+        origin: "earth",
+        distanceUnit: "au",
+        formula: () => ({
+          r: 1,
+          primary: { system: "ecliptic", reference: meanEclipticOfDate },
+          coordinates: [
+            {
+              system: "ecliptic",
+              reference: meanEclipticOfDate,
+              longitude: 100,
+              latitude: 0,
+            },
+            {
+              system: "equatorial",
+              reference: trueEclipticOfDate,
+              longitude: 999,
+              latitude: 0,
+            },
+          ],
+        }),
+      },
+      MOON: {
+        outputType: "MULTI_SPHERICAL",
+        origin: "earth",
+        distanceUnit: "km",
+        formula: () => ({
+          r: 384400,
+          primary: { system: "ecliptic", reference: trueEclipticOfDate },
+          coordinates: [
+            {
+              system: "ecliptic",
+              reference: trueEclipticOfDate,
+              longitude: 102,
+              latitude: 5,
+            },
+          ],
+        }),
+      },
+    };
+
+    expect(sunLongitude(algo, 2451545)).toBe(100);
+    expect(moonLongitude(algo, 2451545)).toBe(102);
   });
 });

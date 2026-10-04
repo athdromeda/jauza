@@ -114,6 +114,12 @@ export type LegacyBodyConfig = BodyConfigBase & {
   system: System;
   reference: Reference;
   formula: (input: AlgoInput) => LegacyAlgoOutput;
+  /**
+   * Optional dedicated apparent source. When present its output is an already
+   * observationally corrected state in the same frame/origin/units as
+   * `formula`; `formula` remains the geometric source.
+   */
+  apparentFormula?: (input: AlgoInput) => LegacyAlgoOutput;
 };
 
 /** A coordinate pair published by an algorithm in one explicit frame. */
@@ -143,6 +149,8 @@ export type MultiCoordinateOutput = {
 export type MultiCoordinateBodyConfig = BodyConfigBase & {
   outputType: "MULTI_SPHERICAL";
   formula: (input: AlgoInput) => MultiCoordinateOutput;
+  /** Optional dedicated apparent source; see `LegacyBodyConfig.apparentFormula`. */
+  apparentFormula?: (input: AlgoInput) => MultiCoordinateOutput;
 };
 
 export type BodyConfig = LegacyBodyConfig | MultiCoordinateBodyConfig;

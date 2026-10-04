@@ -72,6 +72,12 @@ export type GeometricView = {
   readonly epsilon: number;
 };
 
+type StateResolver = (
+  state: CoordinateState<Vec3>,
+  system: System,
+  reference: Reference
+) => CoordinateState<Vec3>;
+
 export abstract class Body {
   readonly type: BodyType;
   time: Time;
@@ -87,8 +93,16 @@ export abstract class Body {
   #dirty = true;
   /** Every native coordinate pair this body's own formula published. */
   #nativeSources: readonly Position[] = [];
+  /** This body's own dedicated apparent position, when its config publishes one. */
+  #apparentSource: Position | null = null;
+  /** Every native coordinate pair this body's apparent formula published. */
+  #apparentNativeSources: readonly Position[] = [];
   /** The observed target's native coordinate pairs, at the target's origin. */
   #targetNative: readonly Position[] = [];
+  /** The observed target's dedicated apparent position, at the target's origin. */
+  #targetApparent: Position | null = null;
+  /** The observed target's apparent native pairs, at the target's origin. */
+  #targetApparentNative: readonly Position[] = [];
   /** Whether the observation is an identity translation of the target, so its
    * geocentric native coordinates remain authoritative. */
   #nativeTargetEligible = false;
@@ -182,6 +196,8 @@ export abstract class Body {
     this.#targetBody = target;
     this.target = target.source;
     this.#targetNative = target.#nativeSources;
+    this.#targetApparent = target.#apparentSource;
+    this.#targetApparentNative = target.#apparentNativeSources;
     this.#refreshNativeEligibility();
     return this.#refresh();
   }
@@ -208,20 +224,42 @@ export abstract class Body {
 
   #compute(): void {
     if (!this.#dirty && this.#apparentState && this.#geometricState) return;
+    const jd = feedJd(this.time, this.algo);
+    const scale = feedScale(this.time, this.algo);
+
     const rel = relative(this.source, this.target, this.resolver);
     const position: Position = { ...rel, origin: this.homeOrigin };
-    this.#geometricState = coordinateState(
-      position,
-      this.type,
-      feedJd(this.time, this.algo),
-      feedScale(this.time, this.algo),
-      { dynamic: true }
-    );
-    this.#apparentState = this.#toApparent(this.#geometricState);
+    this.#geometricState = coordinateState(position, this.type, jd, scale, {
+      dynamic: true,
+    });
+
+    if (this.#targetApparent) {
+      // Dedicated apparent source: passed through frame edges only; its own
+      // observational corrections are already included and must not be
+      // re-applied by metadata transformation edges.
+      const relApparent = relative(
+        this.source,
+        this.#targetApparent,
+        this.resolver
+      );
+      const apparentPosition: Position = {
+        ...relApparent,
+        origin: this.homeOrigin,
+      };
+      const seed = coordinateState(apparentPosition, this.type, jd, scale, {
+        dynamic: true,
+      });
+      this.#apparentState = this.#toApparent(seed, false);
+    } else {
+      this.#apparentState = this.#toApparent(this.#geometricState, true);
+    }
     this.#dirty = false;
   }
 
-  #toApparent(geo: CoordinateState<Vec3>): CoordinateState<Vec3> {
+  #toApparent(
+    geo: CoordinateState<Vec3>,
+    includeCorrections: boolean
+  ): CoordinateState<Vec3> {
     const ctx = graphContext(this.time);
     const targetKey: CoordinateStateKey = {
       system: "ecliptic",
@@ -240,6 +278,7 @@ export abstract class Body {
         corrections: t.edge.correction ? [t.edge.correction] : [],
       });
     }
+    if (!includeCorrections) return state;
     return applyCorrections(state, ctx, this.#correctionEdges(), baseSteps)
       .state;
   }
@@ -255,6 +294,8 @@ export abstract class Body {
     this.resolver = buildResolver(algo, jd);
     const cfg = algo[this.type];
     this.#nativeSources = [];
+    this.#apparentSource = null;
+    this.#apparentNativeSources = [];
     if (cfg) {
       const raw = cfg.formula({ jd }) as AlgoOutput;
       const normalized = normalizeBodyOutput(raw, cfg);
@@ -266,11 +307,25 @@ export abstract class Body {
         this.resolver.system,
         jd
       );
+      if (cfg.apparentFormula) {
+        const rawApparent = cfg.apparentFormula({ jd }) as AlgoOutput;
+        const normalizedApparent = normalizeBodyOutput(rawApparent, cfg);
+        this.#apparentNativeSources = normalizedApparent.native;
+        this.#apparentSource = canonicalize(
+          normalizedApparent.primary,
+          cfg,
+          this.resolver.reference,
+          this.resolver.system,
+          jd
+        );
+      }
     }
     if (this.#targetBody) {
       this.#targetBody.with(algo);
       this.target = this.#targetBody.source;
       this.#targetNative = this.#targetBody.#nativeSources;
+      this.#targetApparent = this.#targetBody.#apparentSource;
+      this.#targetApparentNative = this.#targetBody.#apparentNativeSources;
       this.#refreshNativeEligibility();
     }
     return this.#refresh();
@@ -315,7 +370,14 @@ export abstract class Body {
    */
   explainCoordinates(system: System, reference: Reference): Provenance {
     this.#compute();
-    const native = this.#nativeTargetPosition(system, reference);
+    // An apparent (true-of-date) request on a dedicated-apparent adapter must
+    // consult the apparent native table, never the geometric one.
+    const apparentRequest =
+      this.#targetApparent !== null && reference.orientation === "true";
+    const native = apparentRequest
+      ? this.#nativeTargetPosition(system, reference, this.#targetApparentNative)
+      : this.#nativeTargetPosition(system, reference);
+    const source = apparentRequest ? "apparent-native-table" : "native-table";
     const ctx = {
       ...graphContext(this.time),
       ...(this.algo ? { algorithm: this.algo.name } : {}),
@@ -333,7 +395,7 @@ export abstract class Body {
             from: key,
             to: key,
             corrections: [],
-            metadata: { source: "native-table" },
+            metadata: { source },
           },
         ],
       };
@@ -363,15 +425,18 @@ export abstract class Body {
 
   /**
    * Exact native coordinate pair for the requested frame, when the observed
-   * target published one and no origin translation invalidated it.
+   * target published one and no origin translation invalidated it. The
+   * `sources` array defaults to the geometric native table; apparent accessors
+   * pass the dedicated apparent native table.
    */
   #nativeTargetPosition(
     system: System,
-    reference: Reference
+    reference: Reference,
+    sources: readonly Position[] = this.#targetNative
   ): Position | null {
     if (!this.#nativeTargetEligible) return null;
     return (
-      this.#targetNative.find(
+      sources.find(
         (position) =>
           position.origin === this.homeOrigin &&
           position.system === system &&
@@ -399,6 +464,19 @@ export abstract class Body {
         { source: "native-table" }
       );
     }
+    return this.#frameState(fallback, system, reference);
+  }
+
+  /**
+   * Resolve a state purely through the frame graph, never via native
+   * shortcuts. Used for dedicated apparent states, whose native tables hold
+   * geometric coordinates and must not shadow the apparent vector.
+   */
+  #frameState(
+    fallback: CoordinateState<Vec3>,
+    system: System,
+    reference: Reference
+  ): CoordinateState<Vec3> {
     const targetKey: CoordinateStateKey = {
       system,
       reference,
@@ -412,11 +490,51 @@ export abstract class Body {
     return traced.length ? traced.at(-1)!.state : fallback;
   }
 
+  /**
+   * Resolve a state for a dedicated apparent read: the apparent native pair
+   * wins when available, otherwise the dedicated apparent vector is transformed
+   * through the frame graph. Geometric native coordinates are never consulted.
+   */
+  #apparentStateFor(
+    fallback: CoordinateState<Vec3>,
+    system: System,
+    reference: Reference
+  ): CoordinateState<Vec3> {
+    const native = this.#nativeTargetPosition(
+      system,
+      reference,
+      this.#targetApparentNative
+    );
+    if (native) {
+      return coordinateState(
+        native,
+        this.type,
+        feedJd(this.time, this.algo),
+        feedScale(this.time, this.algo),
+        { source: "apparent-native-table" }
+      );
+    }
+    return this.#frameState(fallback, system, reference);
+  }
+
+  /**
+   * Resolver for apparent accessors: dedicated apparent adapters read the
+   * apparent native table and vector; everyone else keeps the legacy path.
+   */
+  #apparentResolver(): StateResolver {
+    return this.#targetApparent
+      ? (state, system, reference) =>
+          this.#apparentStateFor(state, system, reference)
+      : (state, system, reference) => this.stateFor(state, system, reference);
+  }
+
   #readEcliptic(
     state: CoordinateState<Vec3>,
-    reference: Reference
+    reference: Reference,
+    resolve: StateResolver = (state, system, reference) =>
+      this.stateFor(state, system, reference)
   ): GeometricView["ecliptic"] {
-    const resolved = this.stateFor(state, "ecliptic", reference);
+    const resolved = resolve(state, "ecliptic", reference);
     const s = toSpherical(resolved.position);
     return {
       l: new DMS(normalizeAngle(s.representation.lon, 0, 360)),
@@ -427,19 +545,35 @@ export abstract class Body {
     };
   }
 
-  #readRA(state: CoordinateState<Vec3>, reference: Reference): DMS {
-    const s = toSpherical(this.stateFor(state, "equatorial", reference).position);
+  #readRA(
+    state: CoordinateState<Vec3>,
+    reference: Reference,
+    resolve: StateResolver = (state, system, reference) =>
+      this.stateFor(state, system, reference)
+  ): DMS {
+    const resolved = resolve(state, "equatorial", reference);
+    const s = toSpherical(resolved.position);
     return new DMS(normalizeAngle(s.representation.lon, 0, 360));
   }
 
-  #readDec(state: CoordinateState<Vec3>, reference: Reference): DMS {
-    const s = toSpherical(this.stateFor(state, "equatorial", reference).position);
+  #readDec(
+    state: CoordinateState<Vec3>,
+    reference: Reference,
+    resolve: StateResolver = (state, system, reference) =>
+      this.stateFor(state, system, reference)
+  ): DMS {
+    const resolved = resolve(state, "equatorial", reference);
+    const s = toSpherical(resolved.position);
     return new DMS(normalizeAngle(s.representation.lat, -90, 90));
   }
 
   get ecliptic() {
     this.#compute();
-    return this.#readEcliptic(this.#apparentState!, trueEclipticOfDate);
+    return this.#readEcliptic(
+      this.#apparentState!,
+      trueEclipticOfDate,
+      this.#apparentResolver()
+    );
   }
 
   get lambda() {
@@ -456,12 +590,47 @@ export abstract class Body {
 
   get ra() {
     this.#compute();
-    return this.#readRA(this.#apparentState!, trueEquatorialOfDate);
+    return this.#readRA(
+      this.#apparentState!,
+      trueEquatorialOfDate,
+      this.#apparentResolver()
+    );
   }
 
   get dec() {
     this.#compute();
-    return this.#readDec(this.#apparentState!, trueEquatorialOfDate);
+    return this.#readDec(
+      this.#apparentState!,
+      trueEquatorialOfDate,
+      this.#apparentResolver()
+    );
+  }
+
+  /** Whether the observed target published a dedicated apparent source. */
+  protected get hasDedicatedApparent(): boolean {
+    return this.#targetApparent !== null;
+  }
+
+  /**
+   * Seed state for horizontal coordinates: the dedicated apparent state when
+   * the target publishes one, otherwise the geometric state (legacy behavior).
+   */
+  protected get horizontalSeed(): CoordinateState<Vec3> {
+    this.#compute();
+    return this.#targetApparent ? this.#apparentState! : this.#geometricState!;
+  }
+
+  /**
+   * Resolve a horizontal seed to true equatorial of date. Dedicated apparent
+   * states use the apparent native table or apparent vector; legacy states keep
+   * the geometric native preference.
+   */
+  protected resolveHorizontal(
+    seed: CoordinateState<Vec3>
+  ): CoordinateState<Vec3> {
+    return this.hasDedicatedApparent
+      ? this.#apparentStateFor(seed, "equatorial", trueEquatorialOfDate)
+      : this.stateFor(seed, "equatorial", trueEquatorialOfDate);
   }
 
   get epsilon() {

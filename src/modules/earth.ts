@@ -2,7 +2,6 @@ import { topocentricHorizontal } from "../math/topocentric.js";
 import { getQibla as getQiblaDirection } from "../utils/qibla.js";
 import { Body } from "./body.js";
 import { Time } from "./time.js";
-import { trueEquatorialOfDate } from "./position.js";
 
 type CoordinateArray = [number, number] | [number, number, number];
 
@@ -53,14 +52,15 @@ export class Earth extends Body {
   }
 
   /**
-   * Topocentric horizontal coordinates of the observed body: the target's
-   * true-equatorial-of-date Cartesian position minus the WGS-84 observer
-   * position, rotated into local east/north/up. Geometric (unrefracted).
-   * Prefers the published native true-equatorial pair when available.
+   * Topocentric horizontal coordinates of the observed body. When the target
+   * publishes a dedicated apparent source the apparent true-equatorial-of-date
+   * vector is used; otherwise the geometric vector is used (legacy behavior).
+   * Either way the WGS-84 observer position is subtracted and the result is
+   * rotated into local east/north/up. Geometric (unrefracted).
    */
   get horizontal() {
-    const geo = this.geometric().position;
-    const equatorial = this.stateFor(geo, "equatorial", trueEquatorialOfDate);
+    const seed = this.horizontalSeed;
+    const equatorial = this.resolveHorizontal(seed);
     const v = equatorial.value;
     return topocentricHorizontal(
       [v.x, v.y, v.z],

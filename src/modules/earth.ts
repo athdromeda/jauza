@@ -1,8 +1,4 @@
-import {
-  eclipticToEquatorial,
-  equatorialToHorizontal,
-  xyzToEcliptic,
-} from "../math/astrometry.js";
+import { equatorialToHorizontal } from "../math/astrometry.js";
 import { normalizeHour } from "../math/unit.js";
 import { getQibla as getQiblaDirection } from "../utils/qibla.js";
 import { Body } from "./body.js";
@@ -57,10 +53,9 @@ export class Earth extends Body {
   }
 
   get horizontal() {
-    const equatorial = eclipticToEquatorial(this.ecliptic);
-    const lst = normalizeHour(this.time.gst + this.lng / 15);
-    const ha = lst * 15 - equatorial.ra.decimal;
-    return equatorialToHorizontal(equatorial, this.lat, ha);
+    const lst = normalizeHour(this.time.gast + this.lng / 15);
+    const ha = lst * 15 - this.ra.decimal;
+    return equatorialToHorizontal({ ra: this.ra, dec: this.dec }, this.lat, ha);
   }
 
   get alt() {

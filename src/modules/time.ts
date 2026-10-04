@@ -1,4 +1,7 @@
 import { decToHms, normalizeHour } from "../math/unit.js";
+import { cos } from "../math/trigonometry.js";
+import { trueObliquity } from "../transformations/obliquity.js";
+import { nutationAngles } from "../transformations/nutation.js";
 import type { TimeScale } from "../contract.js";
 import { jdInScale } from "../frames/time-scale.js";
 import {
@@ -310,6 +313,16 @@ export class Time {
 
   get gst() {
     return this.toGST();
+  }
+
+  toGAST() {
+    const { dpsi } = nutationAngles(this.#jd);
+    const equationOfEquinoxesHours = (dpsi * cos(trueObliquity(this.#jd))) / 15;
+    return normalizeHour(this.toGST() + equationOfEquinoxesHours);
+  }
+
+  get gast() {
+    return this.toGAST();
   }
 
   get scale(): TimeScale {

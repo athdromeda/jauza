@@ -26,10 +26,8 @@ export const normalizeAngle = (
 };
 
 export const normalizeHour = (hour: number) => {
-  if (hour < 0) {
-    return hour + 24;
-  }
-  return hour % 24;
+  const normalized = hour % 24;
+  return normalized < 0 ? normalized + 24 : normalized;
 };
 
 export const AU_KM = 149597870.7;

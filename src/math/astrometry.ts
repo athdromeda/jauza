@@ -43,7 +43,7 @@ export const xyzToEcliptic = (
 
 export const eclipticToEquatorial = (
   ecliptic: EclipticValues,
-  epsilon: number = 23.5 // TODO: handle epsilon low-meeus
+  epsilon: number
 ): EquatorialValues => {
   const { l: lambda, b: beta } = ecliptic;
   const alpha = atan2(
@@ -64,7 +64,7 @@ export const eclipticToEquatorial = (
 
 export const equatorialToEcliptic = (
   equatorial: EquatorialValues,
-  epsilon: number = 23.5
+  epsilon: number
 ): EclipticValues => {
   const { ra: alpha, dec: delta } = equatorial;
   const sinBeta =

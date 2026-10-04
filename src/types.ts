@@ -102,7 +102,8 @@ export const ORIGIN_FOR: Record<BodyType, Origin> = {
 
 type BodyConfigBase = {
   origin: Origin;
-  /** Units of the `r` (distance) component returned by `formula`. */
+  /** Native units of the `r` component returned by `formula`; Positions produced
+   * from it are canonicalized to km. */
   distanceUnit: DistanceUnit;
   toCanonical?: (pos: Position, jd: number) => Position;
 };

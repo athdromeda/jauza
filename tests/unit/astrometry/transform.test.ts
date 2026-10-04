@@ -8,6 +8,7 @@ import {
   trueEquatorialOfDate,
 } from "../../../src/modules/position.js";
 import { Vec3 } from "../../../src/modules/vec3.js";
+import { AU_KM } from "../../../src/math/unit.js";
 import {
   assertSameReference,
   createResolver,
@@ -220,7 +221,7 @@ const eclipticOut: BodyConfig = {
 };
 
 describe("toPosition", () => {
-  it("wraps raw spherical output into a cartesian Position with metadata", () => {
+  it("wraps raw spherical output into a km-canonical cartesian Position", () => {
     const pos = toPosition({ l: 10, b: 0, r: 1 }, eclipticOut);
     expect(pos.origin).toBe("earth");
     expect(pos.system).toBe("ecliptic");
@@ -229,8 +230,8 @@ describe("toPosition", () => {
     const cos10 = Math.cos((10 * Math.PI) / 180);
     const sin10 = Math.sin((10 * Math.PI) / 180);
     const vec = (pos.representation as { kind: "cartesian"; vec3: Vec3 }).vec3;
-    expect(vec.x).toBeCloseTo(cos10);
-    expect(vec.y).toBeCloseTo(cos10 === 0 ? 1 : sin10);
+    expect(vec.x).toBeCloseTo(AU_KM * cos10);
+    expect(vec.y).toBeCloseTo(AU_KM * (cos10 === 0 ? 1 : sin10));
     expect(vec.z).toBeCloseTo(0);
   });
 });

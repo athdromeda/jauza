@@ -1,4 +1,5 @@
 import { asin, atan2, cos, sin } from "../math/trigonometry.js";
+import { toKm } from "../math/unit.js";
 import { toFrame } from "../frames/convert.js";
 import { meanEclipticOfDate } from "./position.js";
 import type {
@@ -207,7 +208,7 @@ const positionFromNative = (
     kind: "spherical",
     lon: coordinates.longitude,
     lat: coordinates.latitude,
-    r,
+    r: toKm(r, cfg.distanceUnit),
   },
   origin: cfg.origin,
   system: coordinates.system,
@@ -231,7 +232,7 @@ export function normalizeBodyOutput(
     const primary: Position = {
       representation: {
         kind: "cartesian",
-        vec3: sphericalToCartesian(l, b, r),
+        vec3: sphericalToCartesian(l, b, toKm(r, cfg.distanceUnit)),
       },
       origin: cfg.origin,
       system: cfg.system,

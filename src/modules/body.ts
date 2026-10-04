@@ -12,10 +12,9 @@ import {
   type AlgoConfig,
   type AlgoOutput,
   type BodyType,
-  type DistanceUnit,
   ORIGIN_FOR,
 } from "../types.js";
-import { normalizeAngle, toKm } from "../math/unit.js";
+import { normalizeAngle } from "../math/unit.js";
 import {
   applyCorrections,
   edgeLabel,
@@ -58,7 +57,7 @@ export type GeometricView = {
   readonly position: CoordinateState<Vec3>;
   readonly lambda: DMS;
   readonly beta: DMS;
-  readonly r: number;
+  readonly r: number; // Geocentric distance, kilometres (canonical).
   /** Geocentric distance, always in kilometres (canonical, unit-independent). */
   readonly rKm: number;
   readonly ecliptic: {
@@ -86,11 +85,6 @@ export abstract class Body {
   #geometricState: CoordinateState<Vec3> | null = null;
   #apparentState: CoordinateState<Vec3> | null = null;
   #dirty = true;
-  /** Unit of the current geometric `r`, per the active algo's config. */
-  #rUnit: DistanceUnit | undefined;
-  /** Whether this body's own formula is an origin marker (`r === 0`), meaning
-   * the observed distance magnitude comes from the *other* body's formula. */
-  #sourceOriginMarker = false;
   /** Every native coordinate pair this body's own formula published. */
   #nativeSources: readonly Position[] = [];
   /** The observed target's native coordinate pairs, at the target's origin. */
@@ -127,11 +121,6 @@ export abstract class Body {
       system: this.resolver.system,
       reference: this.resolver.reference,
     };
-  }
-
-  /** Declared unit of the current geometric `r`, from the active algo config. */
-  get distanceUnit(): DistanceUnit | undefined {
-    return this.#rUnit;
   }
 
   get position(): CoordinateState<Vec3> {
@@ -184,7 +173,8 @@ export abstract class Body {
    * returns `this` — the shared observer instance. Each call re-targets the
    * instance, so previously returned handles (e.g. from an earlier `observe`)
    * silently read the latest target. To observe several bodies, create a fresh
-   * observer per body.
+   * observer per body. Positions are canonical km, so the observed distance
+   * magnitude always comes from the (translated) target vector.
    */
   observe(BodyClass: new (time: Time) => Body) {
     const target = new BodyClass(this.time);
@@ -193,21 +183,7 @@ export abstract class Body {
     this.target = target.source;
     this.#targetNative = target.#nativeSources;
     this.#refreshNativeEligibility();
-    this.#resolveDistanceUnit(target);
     return this.#refresh();
-  }
-
-  /**
-   * The observed distance magnitude comes from the *target's* formula unless
-   * that formula is an origin marker (r=0), in which case it comes from the
-   * observer's own formula. Convert using the config that produced the value.
-   */
-  #resolveDistanceUnit(target: Body): void {
-    const observerUnit = this.algo?.[this.type]?.distanceUnit;
-    const targetUnit = target.distanceUnit;
-    this.#rUnit = target.#sourceOriginMarker
-      ? observerUnit ?? targetUnit
-      : targetUnit ?? observerUnit;
   }
 
   at(time: Time) {
@@ -275,17 +251,14 @@ export abstract class Body {
 
   with(algo: AlgoConfig) {
     this.algo = algo as AlgorithmAdapter;
-    this.#rUnit = algo[this.type]?.distanceUnit;
     const jd = feedJd(this.time, this.algo);
     this.resolver = buildResolver(algo, jd);
     const cfg = algo[this.type];
     this.#nativeSources = [];
-    this.#sourceOriginMarker = false;
     if (cfg) {
       const raw = cfg.formula({ jd }) as AlgoOutput;
       const normalized = normalizeBodyOutput(raw, cfg);
       this.#nativeSources = normalized.native;
-      this.#sourceOriginMarker = raw.r === 0;
       this.source = canonicalize(
         normalized.primary,
         cfg,
@@ -299,7 +272,6 @@ export abstract class Body {
       this.target = this.#targetBody.source;
       this.#targetNative = this.#targetBody.#nativeSources;
       this.#refreshNativeEligibility();
-      this.#resolveDistanceUnit(this.#targetBody);
     }
     return this.#refresh();
   }
@@ -449,7 +421,7 @@ export abstract class Body {
     return {
       l: new DMS(normalizeAngle(s.representation.lon, 0, 360)),
       b: new DMS(normalizeAngle(s.representation.lat, -90, 90)),
-      r: toKm(s.representation.r, this.#rUnit),
+      r: s.representation.r,
       system: "ecliptic",
       reference,
     };

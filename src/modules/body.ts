@@ -1,5 +1,6 @@
 import {
   coordinateState,
+  keyOf,
   type AlgorithmAdapter,
   type CoordinateState,
   type CoordinateStateKey,
@@ -29,19 +30,20 @@ import {
   type Origin,
   type Position,
   type Reference,
+  type System,
 } from "./position.js";
 import type { OriginResolver } from "./transform.js";
 import {
   buildResolver,
   canonicalize,
   createResolver,
+  normalizeBodyOutput,
   referencesEqual,
   relative,
-  toPosition,
+  toCartesian,
   toSpherical,
 } from "./transform.js";
 import { meanObliquity, trueObliquity } from "../transformations/obliquity.js";
-import { toFrame } from "../frames/convert.js";
 import { EdgeRegistry, registerStandardEdges } from "../frames/registry.js";
 import {
   feedJd,
@@ -89,6 +91,16 @@ export abstract class Body {
   /** Whether this body's own formula is an origin marker (`r === 0`), meaning
    * the observed distance magnitude comes from the *other* body's formula. */
   #sourceOriginMarker = false;
+  /** Every native coordinate pair this body's own formula published. */
+  #nativeSources: readonly Position[] = [];
+  /** The observed target's native coordinate pairs, at the target's origin. */
+  #targetNative: readonly Position[] = [];
+  /** Whether the observation is an identity translation of the target, so its
+   * geocentric native coordinates remain authoritative. */
+  #nativeTargetEligible = false;
+  /** The live target body from the last `observe`, so a later `with` can still
+   * configure it (the `.observe(X).with(algo)` call order). */
+  #targetBody: Body | null = null;
 
   constructor(time: Time, type: BodyType) {
     this.type = type;
@@ -177,22 +189,45 @@ export abstract class Body {
   observe(BodyClass: new (time: Time) => Body) {
     const target = new BodyClass(this.time);
     if (this.algo) target.with(this.algo);
+    this.#targetBody = target;
     this.target = target.source;
-    // The observed distance magnitude comes from the *target's* formula unless
-    // that formula is an origin marker (r=0), in which case it comes from the
-    // observer's own formula. Convert using the config that produced the value.
+    this.#targetNative = target.#nativeSources;
+    this.#refreshNativeEligibility();
+    this.#resolveDistanceUnit(target);
+    return this.#refresh();
+  }
+
+  /**
+   * The observed distance magnitude comes from the *target's* formula unless
+   * that formula is an origin marker (r=0), in which case it comes from the
+   * observer's own formula. Convert using the config that produced the value.
+   */
+  #resolveDistanceUnit(target: Body): void {
     const observerUnit = this.algo?.[this.type]?.distanceUnit;
     const targetUnit = target.distanceUnit;
     this.#rUnit = target.#sourceOriginMarker
       ? observerUnit ?? targetUnit
       : targetUnit ?? observerUnit;
-    return this.#refresh();
   }
 
   at(time: Time) {
     this.time = time;
     this.#dirty = true;
+    this.#targetNative = [];
+    this.#nativeTargetEligible = false;
+    this.#targetBody?.at(time);
     return this;
+  }
+
+  /** Native shortcuts are valid only for an identity translation to the home
+   * origin; any observer offset or foreign origin invalidates them. */
+  #refreshNativeEligibility(): void {
+    const observer = toCartesian(this.source).representation.vec3;
+    this.#nativeTargetEligible =
+      this.source.origin === this.homeOrigin &&
+      observer.x === 0 &&
+      observer.y === 0 &&
+      observer.z === 0;
   }
 
   #compute(): void {
@@ -244,16 +279,27 @@ export abstract class Body {
     const jd = feedJd(this.time, this.algo);
     this.resolver = buildResolver(algo, jd);
     const cfg = algo[this.type];
+    this.#nativeSources = [];
+    this.#sourceOriginMarker = false;
     if (cfg) {
       const raw = cfg.formula({ jd }) as AlgoOutput;
+      const normalized = normalizeBodyOutput(raw, cfg);
+      this.#nativeSources = normalized.native;
       this.#sourceOriginMarker = raw.r === 0;
       this.source = canonicalize(
-        toPosition(raw, cfg),
+        normalized.primary,
         cfg,
         this.resolver.reference,
         this.resolver.system,
         jd
       );
+    }
+    if (this.#targetBody) {
+      this.#targetBody.with(algo);
+      this.target = this.#targetBody.source;
+      this.#targetNative = this.#targetBody.#nativeSources;
+      this.#refreshNativeEligibility();
+      this.#resolveDistanceUnit(this.#targetBody);
     }
     return this.#refresh();
   }
@@ -291,6 +337,48 @@ export abstract class Body {
     ).provenance;
   }
 
+  /**
+   * Provenance for a specific accessor target, distinguishing an exact native
+   * table read from a graph-derived transformation.
+   */
+  explainCoordinates(system: System, reference: Reference): Provenance {
+    this.#compute();
+    const native = this.#nativeTargetPosition(system, reference);
+    const ctx = {
+      ...graphContext(this.time),
+      ...(this.algo ? { algorithm: this.algo.name } : {}),
+    } as const;
+
+    if (native) {
+      const key = keyOf(native);
+      return {
+        algorithm: ctx.algorithm ?? "",
+        jd: ctx.jd,
+        timeScale: ctx.timeScale,
+        steps: [
+          {
+            label: `${this.algo?.name ?? "algorithm"} native coordinates`,
+            from: key,
+            to: key,
+            corrections: [],
+            metadata: { source: "native-table" },
+          },
+        ],
+      };
+    }
+
+    const seed =
+      reference.orientation === "true"
+        ? this.#apparentState!
+        : this.#geometricState!;
+    const target: CoordinateStateKey = {
+      system,
+      reference,
+      center: seed.key.center,
+    };
+    return this.#graph.explain(seed, target, ctx).provenance;
+  }
+
   #readLambda(state: CoordinateState<Vec3>): DMS {
     const p = toSpherical(state.position);
     return new DMS(normalizeAngle(p.representation.lon, 0, 360));
@@ -301,47 +389,79 @@ export abstract class Body {
     return new DMS(normalizeAngle(p.representation.lat, -90, 90));
   }
 
+  /**
+   * Exact native coordinate pair for the requested frame, when the observed
+   * target published one and no origin translation invalidated it.
+   */
+  #nativeTargetPosition(
+    system: System,
+    reference: Reference
+  ): Position | null {
+    if (!this.#nativeTargetEligible) return null;
+    return (
+      this.#targetNative.find(
+        (position) =>
+          position.origin === this.homeOrigin &&
+          position.system === system &&
+          referencesEqual(position.reference, reference)
+      ) ?? null
+    );
+  }
+
+  /**
+   * Resolve a target state: eligible native coordinates win, otherwise derive
+   * through the frame graph from the given fallback state.
+   */
+  #stateFor(
+    fallback: CoordinateState<Vec3>,
+    system: System,
+    reference: Reference
+  ): CoordinateState<Vec3> {
+    const native = this.#nativeTargetPosition(system, reference);
+    if (native) {
+      return coordinateState(
+        native,
+        this.type,
+        feedJd(this.time, this.algo),
+        feedScale(this.time, this.algo),
+        { source: "native-table" }
+      );
+    }
+    const targetKey: CoordinateStateKey = {
+      system,
+      reference,
+      center: fallback.key.center,
+    };
+    const traced = this.#graph.trace(
+      fallback,
+      targetKey,
+      graphContext(this.time)
+    );
+    return traced.length ? traced.at(-1)!.state : fallback;
+  }
+
   #readEcliptic(
     state: CoordinateState<Vec3>,
     reference: Reference
   ): GeometricView["ecliptic"] {
-    let pos = state.position;
-    if (
-      !referencesEqual(pos.reference, reference) ||
-      pos.system !== "ecliptic"
-    ) {
-      pos = toFrame(pos, "ecliptic", reference, graphJd(this.time));
-    }
-    const s = toSpherical(pos);
+    const resolved = this.#stateFor(state, "ecliptic", reference);
+    const s = toSpherical(resolved.position);
     return {
-      l: new DMS(s.representation.lon),
-      b: new DMS(s.representation.lat),
+      l: new DMS(normalizeAngle(s.representation.lon, 0, 360)),
+      b: new DMS(normalizeAngle(s.representation.lat, -90, 90)),
       r: toKm(s.representation.r, this.#rUnit),
-      system: pos.system,
-      reference: pos.reference,
-    };
-  }
-
-  #equatorialOf(
-    state: CoordinateState<Vec3>,
-    reference: Reference
-  ): CoordinateState<Vec3> {
-    const targetKey: CoordinateStateKey = {
-      system: "equatorial",
+      system: "ecliptic",
       reference,
-      center: state.key.center,
     };
-    const traced = this.#graph.trace(state, targetKey, graphContext(this.time));
-    return traced.length ? traced.at(-1)!.state : state;
   }
 
   #readRA(state: CoordinateState<Vec3>, reference: Reference): DMS {
-    const s = toSpherical(this.#equatorialOf(state, reference).position);
+    const s = toSpherical(this.#stateFor(state, "equatorial", reference).position);
     return new DMS(normalizeAngle(s.representation.lon, 0, 360));
   }
 
   #readDec(state: CoordinateState<Vec3>, reference: Reference): DMS {
-    const s = toSpherical(this.#equatorialOf(state, reference).position);
+    const s = toSpherical(this.#stateFor(state, "equatorial", reference).position);
     return new DMS(normalizeAngle(s.representation.lat, -90, 90));
   }
 
@@ -351,13 +471,11 @@ export abstract class Body {
   }
 
   get lambda() {
-    this.#compute();
-    return this.#readLambda(this.#apparentState!);
+    return this.ecliptic.l;
   }
 
   get beta() {
-    this.#compute();
-    return this.#readBeta(this.#apparentState!);
+    return this.ecliptic.b;
   }
 
   get r() {

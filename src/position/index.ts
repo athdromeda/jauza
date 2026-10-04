@@ -18,6 +18,7 @@ export {
 } from "../modules/position.js";
 export {
   toPosition,
+  normalizeBodyOutput,
   toCartesian,
   toSpherical,
   toOrigin,
@@ -28,6 +29,7 @@ export {
   referencesEqual,
   assertSameReference,
   sphericalToCartesian,
+  type NormalizedBodyOutput,
   type OriginResolver,
   FrameMismatchError,
   MissingOriginOffsetError,

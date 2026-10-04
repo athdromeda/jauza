@@ -9,6 +9,13 @@ import { getDeltaT } from "./time.js";
 import type { AlgoConfig, AlgoOutput, BodyConfig, BodyType } from "../types.js";
 import type { TimeScale } from "../contract.js";
 import { jdInScale, preferredScale } from "../frames/time-scale.js";
+import { toFrame } from "../frames/convert.js";
+import { meanEclipticOfDate } from "../modules/position.js";
+import {
+  normalizeBodyOutput,
+  referencesEqual,
+  toSpherical,
+} from "../modules/transform.js";
 import { brent } from "../math/numerics.js";
 import { semiDiameter } from "./apparent.js";
 
@@ -22,11 +29,36 @@ function resolveConfig(algo: AlgoConfig, type: BodyType): BodyConfig {
 
 const algoScale = (algo: AlgoConfig): TimeScale => preferredScale(algo, "UTC");
 
+/**
+ * Longitude of the primary state, read without a cartesian round-trip so
+ * tabulated values survive exactly. Conjunction is a geometry problem, so it
+ * always uses the declared primary pair, never an alternate native pair.
+ */
+function primaryLongitude(
+  out: AlgoOutput,
+  cfg: BodyConfig,
+  jd: number
+): number {
+  if ("coordinates" in out) {
+    const { primary } = normalizeBodyOutput(out, cfg);
+    if (primary.system === "ecliptic") {
+      const { system, reference } = out.primary;
+      const entry = out.coordinates.find(
+        (c) => c.system === system && referencesEqual(c.reference, reference)
+      )!;
+      return entry.longitude;
+    }
+    return toSpherical(
+      toFrame(primary, "ecliptic", meanEclipticOfDate, jd)
+    ).representation.lon;
+  }
+  return "lambda" in out ? out.lambda : out.l;
+}
+
 function longitudeOf(cfg: BodyConfig, jd: number, scale: TimeScale): number {
   const callJd = jdInScale(jd, "UTC", scale);
   const out = cfg.formula({ jd: callJd }) as AlgoOutput;
-  const lon = "lambda" in out ? out.lambda : out.l;
-  return normalizeAngle(lon, 0, 360);
+  return normalizeAngle(primaryLongitude(out, cfg, callJd), 0, 360);
 }
 
 export function moonLongitude(moonAlgo: AlgoConfig, jd: number): number {
@@ -42,10 +74,9 @@ export function sunLongitude(sunAlgo: AlgoConfig, jd: number): number {
     throw new Error("Rukyat: sun algo is missing both SUN and EARTH");
   }
 
-  const out = cfg.formula({
-    jd: jdInScale(jd, "UTC", algoScale(sunAlgo)),
-  }) as AlgoOutput;
-  const lon = "lambda" in out ? out.lambda : out.l;
+  const callJd = jdInScale(jd, "UTC", algoScale(sunAlgo));
+  const out = cfg.formula({ jd: callJd }) as AlgoOutput;
+  const lon = primaryLongitude(out, cfg, callJd);
 
   return cfg.origin === "sun"
     ? normalizeAngle(lon + 180, 0, 360)

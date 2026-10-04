@@ -94,18 +94,53 @@ export const ORIGIN_FOR: Record<BodyType, Origin> = {
   BODY: "barycenter",
 };
 
-export type BodyConfig = {
-  outputType: OutputType;
+type BodyConfigBase = {
   origin: Origin;
-  system: System;
-  reference: Reference;
-  formula: (input: AlgoInput) => AlgoOutput;
-  toCanonical?: (pos: Position, jd: number) => Position;
   /** Units of the `r` (distance) component returned by `formula`. */
   distanceUnit: DistanceUnit;
+  toCanonical?: (pos: Position, jd: number) => Position;
 };
 
-export type OutputType = "ECLIPTIC" | "EQUATORIAL";
+/** Legacy single-coordinate body config. Kept for backward compatibility. */
+export type LegacyBodyConfig = BodyConfigBase & {
+  outputType: "ECLIPTIC" | "EQUATORIAL";
+  system: System;
+  reference: Reference;
+  formula: (input: AlgoInput) => LegacyAlgoOutput;
+};
+
+/** A coordinate pair published by an algorithm in one explicit frame. */
+export type NativeCoordinates = {
+  system: System;
+  reference: Reference;
+  longitude: number;
+  latitude: number;
+};
+
+/** The `(system, reference)` identity of a native coordinate pair. */
+export type CoordinateKey = {
+  system: System;
+  reference: Reference;
+};
+
+/**
+ * Multi-coordinate output: one primary state (used for vector arithmetic and
+ * origin translation) plus every coordinate pair the source publishes.
+ */
+export type MultiCoordinateOutput = {
+  r: number;
+  primary: CoordinateKey;
+  coordinates: readonly [NativeCoordinates, ...NativeCoordinates[]];
+};
+
+export type MultiCoordinateBodyConfig = BodyConfigBase & {
+  outputType: "MULTI_SPHERICAL";
+  formula: (input: AlgoInput) => MultiCoordinateOutput;
+};
+
+export type BodyConfig = LegacyBodyConfig | MultiCoordinateBodyConfig;
+
+export type OutputType = BodyConfig["outputType"];
 
 export type DistanceUnit = "km" | "au" | "earth-radii";
 
@@ -113,7 +148,9 @@ export type AlgoInput = {
   jd: number;
 };
 
-export type AlgoOutput = GeocentricEcliptic | HeliocentricEcliptic; //to be added more later
+export type LegacyAlgoOutput = GeocentricEcliptic | HeliocentricEcliptic;
+
+export type AlgoOutput = LegacyAlgoOutput | MultiCoordinateOutput;
 
 export type GeocentricEcliptic = {
   lambda: number;

@@ -4,30 +4,34 @@ import { Sun } from "../../../src/modules/sun.js";
 import { Time } from "../../../src/modules/time.js";
 import { eclipticJ2000 } from "../../../src/modules/position.js";
 import { normalizeAngle } from "../../../src/math/unit.js";
-import type { AlgoConfig } from "../../../src/types.js";
+import type { AlgoConfig, LegacyBodyConfig } from "../../../src/types.js";
 
 // Observed Sun at ecliptic longitude ~198° (the 1992-10-13 case from the jpl-de
 // note): `atan2` yields a principal value of ~-162°, which is the same angle as
 // ~198° wrapped. `lambda` is normalized to [0, 360); `ra` must be too.
+const raSun: LegacyBodyConfig = {
+  outputType: "ECLIPTIC",
+  origin: "sun",
+  system: "ecliptic",
+  reference: eclipticJ2000,
+  formula: () => ({ l: 0, b: 0, r: 0 }),
+  distanceUnit: "au",
+};
+
+const raEarth: LegacyBodyConfig = {
+  outputType: "ECLIPTIC",
+  origin: "sun",
+  system: "ecliptic",
+  reference: eclipticJ2000,
+  formula: () => ({ l: 18.38, b: 0, r: 1 }),
+  distanceUnit: "au",
+};
+
 const raFixture: AlgoConfig = {
   name: "fixture-ra",
   bodies: ["SUN", "EARTH"],
-  SUN: {
-    outputType: "ECLIPTIC",
-    origin: "sun",
-    system: "ecliptic",
-    reference: eclipticJ2000,
-    formula: () => ({ l: 0, b: 0, r: 0 }),
-    distanceUnit: "au",
-  },
-  EARTH: {
-    outputType: "ECLIPTIC",
-    origin: "sun",
-    system: "ecliptic",
-    reference: eclipticJ2000,
-    formula: () => ({ l: 18.38, b: 0, r: 1 }),
-    distanceUnit: "au",
-  },
+  SUN: raSun,
+  EARTH: raEarth,
 };
 
 describe("Body.ra / geometric().ra normalization", () => {
@@ -54,7 +58,7 @@ describe("Body.ra / geometric().ra normalization", () => {
       const algo: AlgoConfig = {
         ...raFixture,
         EARTH: {
-          ...raFixture.EARTH!,
+          ...raEarth,
           formula: () => ({ l, b: 0, r: 1 }),
         },
       };

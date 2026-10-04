@@ -5,6 +5,7 @@ import {
   meanEclipticOfDate,
   meanEquatorialOfDate,
   trueEclipticOfDate,
+  trueEquatorialOfDate,
 } from "../../../src/modules/position.js";
 import { Vec3 } from "../../../src/modules/vec3.js";
 import {
@@ -12,6 +13,7 @@ import {
   createResolver,
   FrameMismatchError,
   MissingOriginOffsetError,
+  normalizeBodyOutput,
   referencesEqual,
   relative,
   toCartesian,
@@ -202,7 +204,11 @@ describe("relative", () => {
   });
 });
 
-import type { BodyConfig } from "../../../src/types.js";
+import type {
+  BodyConfig,
+  MultiCoordinateBodyConfig,
+  MultiCoordinateOutput,
+} from "../../../src/types.js";
 
 const eclipticOut: BodyConfig = {
   outputType: "ECLIPTIC",
@@ -226,5 +232,81 @@ describe("toPosition", () => {
     expect(vec.x).toBeCloseTo(cos10);
     expect(vec.y).toBeCloseTo(cos10 === 0 ? 1 : sin10);
     expect(vec.z).toBeCloseTo(0);
+  });
+});
+
+const multiConfig: MultiCoordinateBodyConfig = {
+  outputType: "MULTI_SPHERICAL",
+  origin: "earth",
+  distanceUnit: "au",
+  formula: () => ({
+    r: 1,
+    primary: {
+      system: "ecliptic",
+      reference: meanEclipticOfDate,
+    },
+    coordinates: [
+      {
+        system: "ecliptic",
+        reference: meanEclipticOfDate,
+        longitude: 10,
+        latitude: 1,
+      },
+      {
+        system: "equatorial",
+        reference: trueEquatorialOfDate,
+        longitude: 42,
+        latitude: -7,
+      },
+    ],
+  }),
+};
+
+describe("normalizeBodyOutput", () => {
+  it("preserves every native coordinate entry and selects the declared primary", () => {
+    const output = multiConfig.formula({ jd: 2451545 }) as MultiCoordinateOutput;
+    const normalized = normalizeBodyOutput(output, multiConfig);
+
+    expect(normalized.native).toHaveLength(2);
+    expect(normalized.primary.system).toBe("ecliptic");
+    expect(normalized.primary.reference).toEqual(meanEclipticOfDate);
+    expect(toPosition(output, multiConfig)).toEqual(normalized.primary);
+    expect(normalized.native[1]!.system).toBe("equatorial");
+    expect(normalized.native[1]!.reference).toEqual(trueEquatorialOfDate);
+  });
+
+  it("rejects a primary key missing from coordinates", () => {
+    const output = multiConfig.formula({ jd: 2451545 }) as MultiCoordinateOutput;
+    expect(() =>
+      normalizeBodyOutput(
+        {
+          ...output,
+          primary: {
+            system: "equatorial",
+            reference: meanEclipticOfDate,
+          },
+        },
+        multiConfig,
+      ),
+    ).toThrow(/primary.*coordinates/i);
+  });
+
+  it("rejects duplicate system/reference coordinate keys", () => {
+    const output = multiConfig.formula({ jd: 2451545 }) as MultiCoordinateOutput;
+    expect(() =>
+      normalizeBodyOutput(
+        {
+          ...output,
+          coordinates: [output.coordinates[0]!, output.coordinates[0]!],
+        },
+        multiConfig,
+      ),
+    ).toThrow(/duplicate native coordinates/i);
+  });
+
+  it("normalizes legacy output to one primary/native position", () => {
+    const output = eclipticOut.formula({ jd: 2451545 });
+    const normalized = normalizeBodyOutput(output, eclipticOut);
+    expect(normalized.native).toEqual([normalized.primary]);
   });
 });

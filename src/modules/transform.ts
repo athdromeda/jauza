@@ -15,6 +15,7 @@ import {
   type AlgoConfig,
   type AlgoOutput,
   type BodyConfig,
+  type NativeCoordinates,
 } from "../types.js";
 
 function describeReference(r: Reference): string {
@@ -187,17 +188,97 @@ export function relative(
   };
 }
 
+export type NormalizedBodyOutput = {
+  /** The single state used for vector arithmetic, origin work, and the graph. */
+  primary: Position;
+  /** Every coordinate pair the source published, in declaration order. */
+  native: readonly Position[];
+};
+
+const nativeKey = (entry: { system: System; reference: Reference }): string =>
+  `${entry.system}|${entry.reference.frame}|${entry.reference.orientation}`;
+
+const positionFromNative = (
+  coordinates: NativeCoordinates,
+  r: number,
+  cfg: BodyConfig
+): Position => ({
+  representation: {
+    kind: "spherical",
+    lon: coordinates.longitude,
+    lat: coordinates.latitude,
+    r,
+  },
+  origin: cfg.origin,
+  system: coordinates.system,
+  reference: coordinates.reference,
+});
+
+/**
+ * Normalize either contract branch into one primary position plus all native
+ * positions. Legacy output collapses to a single primary/native position.
+ */
+export function normalizeBodyOutput(
+  out: AlgoOutput,
+  cfg: BodyConfig
+): NormalizedBodyOutput {
+  if (cfg.outputType !== "MULTI_SPHERICAL") {
+    const legacy = out as Exclude<AlgoOutput, { coordinates: unknown }>;
+    const { l, b, r } =
+      "l" in legacy
+        ? { l: legacy.l, b: legacy.b, r: legacy.r }
+        : { l: legacy.lambda, b: legacy.beta, r: legacy.r };
+    const primary: Position = {
+      representation: {
+        kind: "cartesian",
+        vec3: sphericalToCartesian(l, b, r),
+      },
+      origin: cfg.origin,
+      system: cfg.system,
+      reference: cfg.reference,
+    };
+    return { primary, native: [primary] };
+  }
+
+  if (!("coordinates" in out)) {
+    throw new TypeError(
+      "MULTI_SPHERICAL config requires MultiCoordinateOutput"
+    );
+  }
+  if (!Array.isArray(out.coordinates) || out.coordinates.length === 0) {
+    throw new TypeError(
+      "MULTI_SPHERICAL output requires at least one native coordinate"
+    );
+  }
+  if (!out.primary || !out.primary.system || !out.primary.reference) {
+    throw new TypeError(
+      "MULTI_SPHERICAL output requires a primary coordinate key"
+    );
+  }
+
+  const seen = new Set<string>();
+  const native = out.coordinates.map((entry) => {
+    const key = nativeKey(entry);
+    if (seen.has(key)) {
+      throw new TypeError(`Duplicate native coordinates: ${key}`);
+    }
+    seen.add(key);
+    return positionFromNative(entry, out.r, cfg);
+  });
+
+  const primaryKey = nativeKey(out.primary);
+  const primaryIndex = out.coordinates.findIndex(
+    (entry) => nativeKey(entry) === primaryKey
+  );
+  if (primaryIndex < 0) {
+    throw new TypeError(`Primary ${primaryKey} is missing from coordinates`);
+  }
+
+  return { primary: native[primaryIndex]!, native };
+}
+
 export function toPosition(out: AlgoOutput, cfg: BodyConfig): Position {
-  const { l, b, r } =
-    "l" in out
-      ? { l: out.l, b: out.b, r: out.r }
-      : { l: out.lambda, b: out.beta, r: out.r };
-  return {
-    representation: { kind: "cartesian", vec3: sphericalToCartesian(l, b, r) },
-    origin: cfg.origin,
-    system: cfg.system,
-    reference: cfg.reference,
-  };
+  return normalizeBodyOutput(out, cfg).primary;
 }
 
 export function canonicalize(

@@ -8,10 +8,16 @@ export type Vec3 = [number, number, number];
 export type Vec3Tuple = Vec3;
 export type Algo = (time: Date) => Vec3;
 
+export enum CalendarMode {
+  Hybrid = "hybrid", // Julian before 1582, Gregorian after
+  ProlepticGregorian = "proleptic-gregorian", // Gregorian rule applied uniformly to all years.
+}
+
 export type TimeOptions = {
   timezone?: number;
   calendar?: CalendarSystem;
   scale?: TimeScale;
+  mode?: CalendarMode;
 };
 export type TimeArgs =
   | [year: number]

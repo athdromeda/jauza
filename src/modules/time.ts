@@ -2,6 +2,7 @@ import { decToHms, normalizeHour } from "../math/unit.js";
 import type { TimeScale } from "../contract.js";
 import { jdInScale } from "../frames/time-scale.js";
 import {
+  CalendarMode,
   CalendarSystem,
   type CivilTime,
   type TimeFormatOptions,
@@ -14,6 +15,7 @@ export class Time {
   #jd: number;
   #timezone: number;
   #calendar: CalendarSystem;
+  #mode: CalendarMode = CalendarMode.Hybrid;
   #civil: CivilTime | null = null;
   #scale: TimeScale = "UTC";
 
@@ -61,6 +63,7 @@ export class Time {
       this.#scale = opts?.scale ?? "UTC";
       this.#timezone = opts?.timezone ?? 0;
       this.#calendar = this.resolveCalendar(opts);
+      this.#mode = this.resolveMode(opts);
       this.#jd = this.#jdFromGregorianFields(
         jdOrDate.getUTCFullYear(),
         jdOrDate.getUTCMonth() + 1,
@@ -81,6 +84,7 @@ export class Time {
       this.#scale = opts?.scale ?? "UTC";
       this.#timezone = opts?.timezone ?? 0;
       this.#calendar = this.resolveCalendar(opts);
+      this.#mode = this.resolveMode(opts);
       return;
     }
 
@@ -100,6 +104,7 @@ export class Time {
     this.#scale = opts?.scale ?? "UTC";
     this.#timezone = opts?.timezone ?? 0;
     this.#calendar = this.resolveCalendar(opts);
+    this.#mode = this.resolveMode(opts);
     this.#jd =
       this.civilToJDUt(
         jdOrDate,
@@ -153,6 +158,7 @@ export class Time {
     minute: number,
     second: number
   ): number {
+    this.assertCivilDate(year, month, day);
     const M = month >= 3 ? month : month + 12;
     const Y = month >= 3 ? year : year - 1;
 
@@ -172,7 +178,30 @@ export class Time {
     );
   }
 
+  /**
+   * Rejects civil dates that do not exist in the hybrid calendar (the 1582
+   * Gregorian reform skipped 1582-10-05..14). Proleptic-Gregorian mode and the
+   * Julian calendar have no such gap, so they accept these dates.
+   */
+  protected assertCivilDate(year: number, month: number, day: number): void {
+    if (
+      this.#mode !== CalendarMode.Hybrid ||
+      this.#calendar === CalendarSystem.Julian
+    ) {
+      return;
+    }
+    if (year === 1582 && month === 10 && day >= 5 && day <= 14) {
+      throw new RangeError(
+        `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+          2,
+          "0"
+        )} does not exist in the hybrid calendar (Gregorian reform gap 1582-10-05..14); pass mode: CalendarMode.ProlepticGregorian to accept it`
+      );
+    }
+  }
+
   protected isGregorianDate(year: number, month: number, day: number): boolean {
+    if (this.#mode === CalendarMode.ProlepticGregorian) return true;
     if (year > 1582) return true;
     if (year < 1582) return false;
     if (month > 10) return true;
@@ -233,17 +262,23 @@ export class Time {
     return this.#calendar;
   }
 
+  get mode(): CalendarMode {
+    return this.#mode;
+  }
+
   fromJD(jd: number): CivilTime {
     const jd1 = jd + 0.5;
     const Z = Math.floor(jd1);
     const F = jd1 - Z;
-    const A =
-      this.#calendar === CalendarSystem.Julian || Z < 2299161
-        ? Z
-        : Z +
-          1 +
-          Math.floor((Z - 1867216.25) / 36524.25) -
-          Math.floor(Math.floor((Z - 1867216.25) / 36524.25) / 4);
+    const useJulian =
+      this.#calendar === CalendarSystem.Julian ||
+      (this.#mode === CalendarMode.Hybrid && Z < 2299161);
+    const A = useJulian
+      ? Z
+      : Z +
+        1 +
+        Math.floor((Z - 1867216.25) / 36524.25) -
+        Math.floor(Math.floor((Z - 1867216.25) / 36524.25) / 4);
     const B = A + 1524;
     const C = Math.floor((B - 122.1) / 365.25);
     const D = Math.floor(365.25 * C);
@@ -290,6 +325,7 @@ export class Time {
     return new Ctor(jdInScale(this.#jd, this.#scale, scale), {
       timezone: this.#timezone,
       calendar: this.#calendar,
+      mode: this.#mode,
       scale,
     });
   }
@@ -309,7 +345,15 @@ export class Time {
     return calendar;
   }
 
-  private formatString(pattern: string, locale?: string, hijriMonths?: string[]): string {
+  protected resolveMode(options?: TimeOptions): CalendarMode {
+    return options?.mode ?? CalendarMode.Hybrid;
+  }
+
+  private formatString(
+    pattern: string,
+    locale?: string,
+    hijriMonths?: string[]
+  ): string {
     const civil = this.getCivil();
     const loc = locale || "en-US";
     const isHijri = this.#calendar === CalendarSystem.Hijri;
@@ -380,9 +424,16 @@ export class Time {
   format(pattern: string): string;
   format(options: TimeFormatOptions): string;
   format(pattern: string, options: TimeFormatOptions): string;
-  format(patternOrOptions?: string | TimeFormatOptions, options?: TimeFormatOptions): string {
+  format(
+    patternOrOptions?: string | TimeFormatOptions,
+    options?: TimeFormatOptions
+  ): string {
     if (typeof patternOrOptions === "string") {
-      return this.formatString(patternOrOptions, options?.locale, options?.hijriMonths);
+      return this.formatString(
+        patternOrOptions,
+        options?.locale,
+        options?.hijriMonths
+      );
     }
 
     const civil = this.getCivil();

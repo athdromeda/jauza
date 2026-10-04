@@ -40,7 +40,10 @@ function primaryLongitude(
 ): number {
   if ("coordinates" in out) {
     const { primary } = normalizeBodyOutput(out, cfg);
-    if (primary.system === "ecliptic") {
+    if (
+      primary.system === "ecliptic" &&
+      referencesEqual(primary.reference, meanEclipticOfDate)
+    ) {
       const { system, reference } = out.primary;
       const entry = out.coordinates.find(
         (c) => c.system === system && referencesEqual(c.reference, reference)
@@ -51,7 +54,18 @@ function primaryLongitude(
       toFrame(primary, "ecliptic", meanEclipticOfDate, jd)
     ).representation.lon;
   }
-  return "lambda" in out ? out.lambda : out.l;
+
+  const raw = "lambda" in out ? out.lambda : out.l;
+  const { primary } = normalizeBodyOutput(out, cfg);
+  if (
+    primary.system === "ecliptic" &&
+    referencesEqual(primary.reference, meanEclipticOfDate)
+  ) {
+    return raw;
+  }
+  return toSpherical(
+    toFrame(primary, "ecliptic", meanEclipticOfDate, jd)
+  ).representation.lon;
 }
 
 function longitudeOf(cfg: BodyConfig, jd: number, scale: TimeScale): number {

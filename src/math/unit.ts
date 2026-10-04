@@ -21,8 +21,8 @@ export const normalizeAngle = (
   min: number = 0,
   max: number = 360
 ) => {
-  const normalized = angle % (max - min);
-  return normalized < min ? normalized + (max - min) : normalized;
+  const range = max - min;
+  return (((angle - min) % range) + range) % range + min;
 };
 
 export const normalizeHour = (hour: number) => {

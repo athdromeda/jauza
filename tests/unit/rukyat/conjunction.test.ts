@@ -10,11 +10,16 @@ import { Sun } from "../../../src/modules/sun.js";
 import { Moon } from "../../../src/modules/moon.js";
 import { Time } from "../../../src/modules/time.js";
 import {
+  eclipticJ2000,
   meanEclipticOfDate,
   trueEclipticOfDate,
+  type Position,
+  type Reference,
 } from "../../../src/modules/position.js";
 import { equatorialToHorizontal } from "../../../src/math/astrometry.js";
 import { normalizeHour } from "../../../src/math/unit.js";
+import { toFrame } from "../../../src/frames/convert.js";
+import { toSpherical } from "../../../src/modules/transform.js";
 import type { AlgoConfig } from "../../../src/types.js";
 
 const sunStub: AlgoConfig = {
@@ -171,11 +176,11 @@ describe("longitude readers", () => {
         distanceUnit: "km",
         formula: () => ({
           r: 384400,
-          primary: { system: "ecliptic", reference: trueEclipticOfDate },
+          primary: { system: "ecliptic", reference: meanEclipticOfDate },
           coordinates: [
             {
               system: "ecliptic",
-              reference: trueEclipticOfDate,
+              reference: meanEclipticOfDate,
               longitude: 102,
               latitude: 5,
             },
@@ -186,5 +191,149 @@ describe("longitude readers", () => {
 
     expect(sunLongitude(algo, 2451545)).toBe(100);
     expect(moonLongitude(algo, 2451545)).toBe(102);
+  });
+});
+
+describe("conjunction frame consistency", () => {
+  const meanEclipticPosition = (
+    jd: number,
+    lon: number,
+    lat: number,
+    r: number
+  ): Position => ({
+    representation: { kind: "spherical", lon, lat, r },
+    origin: "earth",
+    system: "ecliptic",
+    reference: meanEclipticOfDate,
+  });
+
+  const moonAlgo = (
+    reference: Reference,
+    toPrimary: (jd: number) => Position
+  ): AlgoConfig => ({
+    name: `moon-${reference.frame}`,
+    bodies: ["SUN", "MOON"],
+    SUN: {
+      outputType: "ECLIPTIC",
+      origin: "earth",
+      system: "ecliptic",
+      reference: meanEclipticOfDate,
+      distanceUnit: "au",
+      formula: () => ({ lambda: 0, beta: 0, r: 1 }),
+    },
+    MOON: {
+      outputType: "MULTI_SPHERICAL",
+      origin: "earth",
+      distanceUnit: "km",
+      formula: ({ jd }) => {
+        const pos = toPrimary(jd);
+        const sph = toSpherical(pos).representation;
+        return {
+          r: sph.r,
+          primary: { system: pos.system, reference: pos.reference },
+          coordinates: [
+            {
+              system: pos.system,
+              reference: pos.reference,
+              longitude: sph.lon,
+              latitude: sph.lat,
+            },
+          ],
+        };
+      },
+    },
+  });
+
+  it("solves the same conjunction epoch whether the moon primary is j2000 or mean-of-date", () => {
+    const anchor = new Time(2025, 6, 1).jd;
+    const rate = 13.0;
+    const moonLon = (jd: number) => (jd - anchor) * rate;
+
+    const meanAlgo = moonAlgo(meanEclipticOfDate, (jd) =>
+      meanEclipticPosition(jd, moonLon(jd), 0, 384400)
+    );
+
+    const j2000Algo = moonAlgo(eclipticJ2000, (jd) =>
+      toFrame(
+        meanEclipticPosition(jd, moonLon(jd), 0, 384400),
+        "ecliptic",
+        eclipticJ2000,
+        jd
+      )
+    );
+
+    const meanRes = findConjunction(meanAlgo, meanAlgo, anchor);
+    const j2000Res = findConjunction(j2000Algo, j2000Algo, anchor);
+
+    expect(j2000Res.jde).toBeCloseTo(meanRes.jde, 4);
+  });
+
+  it("reduces a true-of-date ecliptic primary to the mean ecliptic of date", () => {
+    const jd = 2451545;
+    const truePos = toFrame(
+      meanEclipticPosition(jd, 102, 0, 384400),
+      "ecliptic",
+      trueEclipticOfDate,
+      jd
+    );
+    const sph = toSpherical(truePos).representation;
+
+    const algo: AlgoConfig = {
+      name: "moon-true",
+      bodies: ["MOON"],
+      MOON: {
+        outputType: "MULTI_SPHERICAL",
+        origin: "earth",
+        distanceUnit: "km",
+        formula: () => ({
+          r: sph.r,
+          primary: { system: "ecliptic", reference: trueEclipticOfDate },
+          coordinates: [
+            {
+              system: "ecliptic",
+              reference: trueEclipticOfDate,
+              longitude: sph.lon,
+              latitude: sph.lat,
+            },
+          ],
+        }),
+      },
+    };
+
+    const expected = toSpherical(
+      toFrame(truePos, "ecliptic", meanEclipticOfDate, jd)
+    ).representation.lon;
+
+    expect(moonLongitude(algo, jd)).toBeCloseTo(expected, 9);
+  });
+
+  it("reduces a legacy ecliptic j2000 primary to the mean ecliptic of date", () => {
+    const jd = new Time(2025, 6, 1).jd;
+    const j2000Pos = toFrame(
+      meanEclipticPosition(jd, 100, 0, 1),
+      "ecliptic",
+      eclipticJ2000,
+      jd
+    );
+    const j2000Sph = toSpherical(j2000Pos).representation;
+
+    const algo: AlgoConfig = {
+      name: "legacy-sun-j2000",
+      bodies: ["SUN"],
+      SUN: {
+        outputType: "ECLIPTIC",
+        origin: "earth",
+        system: "ecliptic",
+        reference: eclipticJ2000,
+        distanceUnit: "au",
+        formula: () => ({ lambda: j2000Sph.lon, beta: j2000Sph.lat, r: 1 }),
+      },
+    };
+
+    const expected = toSpherical(
+      toFrame(j2000Pos, "ecliptic", meanEclipticOfDate, jd)
+    ).representation.lon;
+
+    expect(sunLongitude(algo, jd)).toBeCloseTo(expected, 8);
   });
 });

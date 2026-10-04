@@ -33,7 +33,10 @@ export {
   scaleShift,
   deltaTDays,
   tdbCorrectionDays,
+  taiMinusUtc,
+  ttMinusUtcDays,
   UnsupportedTimeScaleError,
+  UTCPreEpochError,
 } from "./time-scale.js";
 export type {
   ResolutionStep,

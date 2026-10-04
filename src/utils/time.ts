@@ -1,3 +1,8 @@
+/**
+ * ΔT = TT − UT1 in seconds (Espenak–Meeus polynomials, NASA). This is NOT
+ * TT − UTC; UTC→TT must go through leap seconds (`taiMinusUtc`/`ttMinusUtcDays`
+ * in frames/time-scale). Use this only where TT − UT1 is the required quantity.
+ */
 export function getDeltaT(year: number, month: number = 1) {
   // https://eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html
   const y = year + (month - 0.5) / 12;

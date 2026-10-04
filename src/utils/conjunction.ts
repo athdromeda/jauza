@@ -5,10 +5,9 @@ import { Sun } from "../modules/sun.js";
 import { Moon } from "../modules/moon.js";
 import { DMS, HMS } from "../modules/angle.js";
 import { sin, cos, acos } from "../math/trigonometry.js";
-import { getDeltaT } from "./time.js";
 import type { AlgoConfig, AlgoOutput, BodyConfig, BodyType } from "../types.js";
 import type { TimeScale } from "../contract.js";
-import { jdInScale, preferredScale } from "../frames/time-scale.js";
+import { jdInScale, preferredScale, ttMinusUtcDays } from "../frames/time-scale.js";
 import { toFrame } from "../frames/convert.js";
 import { meanEclipticOfDate } from "../modules/position.js";
 import {
@@ -271,12 +270,12 @@ function resultAt(
 ): ConjunctionResult {
   const moonLon = moonLongitude(moonAlgo, jd);
   const sunLon = sunLongitude(sunAlgo, jd);
-  const year = new Time(jd).year;
 
   const ut = jd;
-  // Keep ΔT→TT for the reported epoch; neglect the ~1.7ms TDB↔TT offset here
-  // (it is far below the ~5-day search window and the root-finder tolerance).
-  const jde = jd + getDeltaT(year) / 86400;
+  // TT = UTC + (TAI−UTC) + 32.184 s via the leap-second/ERFA model. The
+  // ~1.7 ms TDB↔TT offset is neglected (far below the search window and
+  // root-finder tolerance).
+  const jde = jd + ttMinusUtcDays(jd);
   return { jde, ut, moonLon, sunLon };
 }
 

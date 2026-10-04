@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   computeHilalDetails,
+  findConjunction,
   moonLongitude,
   sunLongitude,
 } from "../../../src/utils/conjunction.js";
 import { Earth } from "../../../src/modules/earth.js";
 import { Sun } from "../../../src/modules/sun.js";
+import { Time } from "../../../src/modules/time.js";
 import {
   meanEclipticOfDate,
   trueEclipticOfDate,
@@ -67,6 +69,37 @@ describe("computeHilalDetails", () => {
     // so accept ~0.005°. This still separates the book's target (-0.8416°) from
     // the old -0.833 - 0.0347·√h convention (-0.833°, Δ ≈ 0.0086°).
     expect(sun.alt).toBeCloseTo(expectedTarget, 2);
+  });
+});
+
+describe("findConjunction reported epoch", () => {
+  it("reports jde = ut + (TT−UTC) using leap seconds, not ΔT", () => {
+    const anchor = new Time(2025, 6, 1).jd;
+    const linAlgo: AlgoConfig = {
+      name: "lin-moon",
+      bodies: ["SUN", "MOON"],
+      SUN: {
+        outputType: "ECLIPTIC",
+        origin: "earth",
+        system: "ecliptic",
+        reference: meanEclipticOfDate,
+        distanceUnit: "au",
+        formula: () => ({ lambda: 0, beta: 0, r: 1 }),
+      },
+      MOON: {
+        outputType: "ECLIPTIC",
+        origin: "earth",
+        system: "ecliptic",
+        reference: meanEclipticOfDate,
+        distanceUnit: "km",
+        formula: ({ jd }) => ({ lambda: jd - anchor, beta: 0, r: 384400 }),
+      },
+    };
+    const res = findConjunction(linAlgo, linAlgo, anchor);
+    expect(res.ut).toBeGreaterThan(anchor - 1);
+    expect(res.ut).toBeLessThan(anchor + 1);
+    // 2025: TAI−UTC = 37 → TT−UTC = 69.184 s. Old behavior was ΔT ≈ 74.5 s.
+    expect((res.jde - res.ut) * 86400).toBeCloseTo(37 + 32.184, 2);
   });
 });
 

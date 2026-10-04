@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Time } from "../../../src/modules/time.js";
 import { HijriCalendar } from "../../../src/modules/calendar/hijri.js";
 
@@ -203,5 +203,40 @@ describe("Time.format()", () => {
       const result = hijri.format();
       expect(result).toContain("Syawwal");
     });
+  });
+});
+
+describe("Time(Date) sub-second precision", () => {
+  it("keeps milliseconds from a Date with a fractional second", () => {
+    const t = new Time(new Date("2024-01-01T00:00:00.500Z"));
+    expect(t.jd).toBeCloseTo(2460310.5 + 0.5 / 86400, 9);
+  });
+
+  it("leaves a whole-second Date unchanged", () => {
+    const t = new Time(new Date("2024-01-01T00:00:00.000Z"));
+    expect(t.jd).toBe(2460310.5);
+  });
+
+  it("handles the last millisecond before a day rollover", () => {
+    const jd = new Time(2024, 1, 1, 23, 59, 59).jd + 0.999 / 86400;
+    const t = new Time(new Date("2024-01-01T23:59:59.999Z"));
+    expect(t.jd).toBeCloseTo(jd, 9);
+  });
+
+  it("HijriCalendar(Date) inherits sub-second precision", () => {
+    const date = new Date("2024-01-01T00:00:00.500Z");
+    const fromDate = new HijriCalendar(date);
+    const fromJd = new HijriCalendar(2460310.5 + 0.5 / 86400);
+    expect(fromDate.jd).toBeCloseTo(fromJd.jd, 9);
+  });
+
+  it("Time.now() preserves sub-second precision", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T00:00:00.500Z"));
+    try {
+      expect(Time.now().jd).toBeCloseTo(2460310.5 + 0.5 / 86400, 9);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

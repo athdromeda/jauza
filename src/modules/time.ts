@@ -73,7 +73,7 @@ export class Time {
         jdOrDate.getUTCDate(),
         jdOrDate.getUTCHours(),
         jdOrDate.getUTCMinutes(),
-        jdOrDate.getUTCSeconds()
+        jdOrDate.getUTCSeconds() + jdOrDate.getUTCMilliseconds() / 1000
       );
       return;
     }

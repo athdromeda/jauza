@@ -47,6 +47,11 @@ describe("Time family is callable without new", () => {
     expect(t.year).toBe(2024);
   });
 
+  test("Time(Date) keeps milliseconds on the callable form", () => {
+    const t = Time(new Date("2024-01-01T00:00:00.500Z"));
+    expect(t.jd).toBeCloseTo(2460310.5 + 0.5 / 86400, 9);
+  });
+
   test("new Time(...) still works", () => {
     const t = new Time(2024, 1, 1);
     expect(t.year).toBe(2024);

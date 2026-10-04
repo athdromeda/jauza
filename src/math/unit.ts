@@ -33,17 +33,33 @@ export const normalizeHour = (hour: number) => {
 export const AU_KM = 149597870.7;
 export const EARTH_RADIUS_KM = 6378.14;
 
-/** Convert a distance to canonical kilometres per `unit`; unknown units pass through. */
-export const toKm = (
-  r: number,
-  unit: "km" | "au" | "earth-radii" | undefined
-): number => {
+export type DistanceUnitName = "km" | "au" | "earth-radii";
+
+export class UnsupportedDistanceUnitError extends Error {
+  readonly unit: unknown;
+
+  constructor(unit: unknown) {
+    super(`Unsupported distance unit: ${String(unit)}`);
+    this.name = "UnsupportedDistanceUnitError";
+    this.unit = unit;
+  }
+}
+
+/**
+ * Convert a distance to canonical kilometres per `unit`. Unknown units throw
+ * so that nonconforming algorithm adapters fail loudly instead of producing
+ * plausible-looking wrong magnitudes. Zero distance stays legal: algorithms
+ * may publish `r: 0` as an origin marker.
+ */
+export const toKm = (r: number, unit: DistanceUnitName): number => {
   switch (unit) {
+    case "km":
+      return r;
     case "au":
       return r * AU_KM;
     case "earth-radii":
       return r * EARTH_RADIUS_KM;
     default:
-      return r;
+      throw new UnsupportedDistanceUnitError(unit);
   }
 };

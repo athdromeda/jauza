@@ -2,8 +2,14 @@ import { describe, it, expect } from "vitest";
 import { Earth } from "../../../src/modules/earth.js";
 import { Time } from "../../../src/modules/time.js";
 import { Sun } from "../../../src/modules/sun.js";
-import { trueEclipticOfDate, trueEquatorialOfDate } from "../../../src/modules/position.js";
+import {
+  trueEclipticOfDate,
+  trueEquatorialOfDate,
+} from "../../../src/modules/position.js";
+import { topocentricHorizontal } from "../../../src/math/topocentric.js";
 import { equatorialToHorizontal } from "../../../src/math/astrometry.js";
+import { AU_KM } from "../../../src/math/unit.js";
+import { cos, sin } from "../../../src/math/trigonometry.js";
 import { normalizeHour } from "../../../src/math/unit.js";
 import type { AlgoConfig } from "../../../src/types.js";
 
@@ -39,19 +45,42 @@ const nativeAlgo = (eclLon: number, eclLat: number): AlgoConfig => ({
   },
 });
 
+// Geocentric true-equatorial Cartesian kilometres built from RA/Dec.
+const equatorialKm = (raDeg: number, decDeg: number, rKm: number) =>
+  [
+    rKm * cos(decDeg) * cos(raDeg),
+    rKm * cos(decDeg) * sin(raDeg),
+    rKm * sin(decDeg),
+  ] as const;
+
 describe("Earth.horizontal", () => {
   it("uses the published native equatorial pair, not a hard-coded-23.5° ecliptic conversion", () => {
-    const a = new Earth(lat, lng, 0).at(new Time(jd)).observe(Sun).with(nativeAlgo(90, 0));
-    const b = new Earth(lat, lng, 0).at(new Time(jd)).observe(Sun).with(nativeAlgo(180, 20));
+    const a = new Earth(lat, lng, 0)
+      .at(new Time(jd))
+      .observe(Sun)
+      .with(nativeAlgo(90, 0));
+    const b = new Earth(lat, lng, 0)
+      .at(new Time(jd))
+      .observe(Sun)
+      .with(nativeAlgo(180, 20));
     // Same native equatorial pair (ra=47°, dec=12°) ⇒ same alt/az regardless of ecliptic primary.
     expect(a.alt).toBeCloseTo(b.alt, 9);
     expect(a.az).toBeCloseTo(b.az, 9);
 
+    // The result is the topocentric vector built from the native equatorial pair.
+    const expected = topocentricHorizontal(
+      equatorialKm(a.ra.decimal, a.dec.decimal, AU_KM),
+      { latitude: lat, longitude: lng, elevationM: 0 },
+      a.time.gast
+    );
+    expect(a.alt).toBeCloseTo(expected.alt.decimal, 7);
+    expect(a.az).toBeCloseTo(expected.az.decimal, 7);
+
+    // Topocentric ≠ old geocentric DMS+hour-angle path: solar parallax shifts alt.
     const lst = normalizeHour(a.time.gast + lng / 15);
     const ha = lst * 15 - a.ra.decimal;
-    const expected = equatorialToHorizontal({ ra: a.ra, dec: a.dec }, lat, ha);
-    expect(a.alt).toBeCloseTo(expected.alt.decimal, 9);
-    expect(a.az).toBeCloseTo(expected.az.decimal, 9);
+    const geocentric = equatorialToHorizontal({ ra: a.ra, dec: a.dec }, lat, ha);
+    expect(a.alt).not.toBeCloseTo(geocentric.alt.decimal, 6);
   });
 
   it("derives horizontal from frame-graph RA/Dec and apparent sidereal time (legacy path)", () => {
@@ -68,11 +97,13 @@ describe("Earth.horizontal", () => {
       },
     };
     const obs = new Earth(lat, lng, 0).at(new Time(jd)).observe(Sun).with(algo);
-    const lst = normalizeHour(obs.time.gast + lng / 15);
-    const ha = lst * 15 - obs.ra.decimal;
-    const expected = equatorialToHorizontal({ ra: obs.ra, dec: obs.dec }, lat, ha);
-    expect(obs.alt).toBeCloseTo(expected.alt.decimal, 9);
-    expect(obs.az).toBeCloseTo(expected.az.decimal, 9);
+    const expected = topocentricHorizontal(
+      equatorialKm(obs.ra.decimal, obs.dec.decimal, AU_KM),
+      { latitude: lat, longitude: lng, elevationM: 0 },
+      obs.time.gast
+    );
+    expect(obs.alt).toBeCloseTo(expected.alt.decimal, 7);
+    expect(obs.az).toBeCloseTo(expected.az.decimal, 7);
     // True-of-date obliquity is ~23.44°, not the old 23.5° constant.
     expect(Math.abs(obs.dec.decimal - 23.436)).toBeLessThan(0.01);
   });

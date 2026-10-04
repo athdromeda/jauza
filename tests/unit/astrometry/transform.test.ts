@@ -8,7 +8,12 @@ import {
   trueEquatorialOfDate,
 } from "../../../src/modules/position.js";
 import { Vec3 } from "../../../src/modules/vec3.js";
-import { AU_KM } from "../../../src/math/unit.js";
+import {
+  AU_KM,
+  EARTH_RADIUS_KM,
+  toKm,
+  UnsupportedDistanceUnitError,
+} from "../../../src/math/unit.js";
 import {
   assertSameReference,
   createResolver,
@@ -309,5 +314,39 @@ describe("normalizeBodyOutput", () => {
     const output = eclipticOut.formula({ jd: 2451545 });
     const normalized = normalizeBodyOutput(output, eclipticOut);
     expect(normalized.native).toEqual([normalized.primary]);
+  });
+});
+
+describe("toKm canonical units", () => {
+  it("is the identity for kilometres", () => {
+    expect(toKm(384400, "km")).toBe(384400);
+  });
+
+  it("converts au and earth-radii to the same kilometres", () => {
+    expect(toKm(1, "au")).toBeCloseTo(AU_KM);
+    expect(toKm(1, "earth-radii")).toBeCloseTo(EARTH_RADIUS_KM);
+  });
+
+  it("converts the same physical vector identically in every unit", () => {
+    const km = toKm(149597870.7, "km");
+    const au = toKm(1, "au");
+    const radii = toKm(149597870.7 / EARTH_RADIUS_KM, "earth-radii");
+    expect(au).toBeCloseTo(km, 6);
+    expect(radii).toBeCloseTo(km, 6);
+  });
+
+  it("throws on an unknown unit instead of passing through", () => {
+    expect(() => toKm(1, "miles" as never)).toThrow(UnsupportedDistanceUnitError);
+    expect(() => toKm(1, undefined as never)).toThrow(UnsupportedDistanceUnitError);
+  });
+
+  it("throws when an algorithm publishes an unknown distance unit", () => {
+    const bad: BodyConfig = {
+      ...eclipticOut,
+      distanceUnit: "miles" as never,
+    };
+    expect(() => toPosition({ l: 10, b: 0, r: 1 }, bad)).toThrow(
+      UnsupportedDistanceUnitError,
+    );
   });
 });

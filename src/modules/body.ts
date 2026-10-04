@@ -384,7 +384,7 @@ export abstract class Body {
    * Resolve a target state: eligible native coordinates win, otherwise derive
    * through the frame graph from the given fallback state.
    */
-  #stateFor(
+  protected stateFor(
     fallback: CoordinateState<Vec3>,
     system: System,
     reference: Reference
@@ -416,7 +416,7 @@ export abstract class Body {
     state: CoordinateState<Vec3>,
     reference: Reference
   ): GeometricView["ecliptic"] {
-    const resolved = this.#stateFor(state, "ecliptic", reference);
+    const resolved = this.stateFor(state, "ecliptic", reference);
     const s = toSpherical(resolved.position);
     return {
       l: new DMS(normalizeAngle(s.representation.lon, 0, 360)),
@@ -428,12 +428,12 @@ export abstract class Body {
   }
 
   #readRA(state: CoordinateState<Vec3>, reference: Reference): DMS {
-    const s = toSpherical(this.#stateFor(state, "equatorial", reference).position);
+    const s = toSpherical(this.stateFor(state, "equatorial", reference).position);
     return new DMS(normalizeAngle(s.representation.lon, 0, 360));
   }
 
   #readDec(state: CoordinateState<Vec3>, reference: Reference): DMS {
-    const s = toSpherical(this.#stateFor(state, "equatorial", reference).position);
+    const s = toSpherical(this.stateFor(state, "equatorial", reference).position);
     return new DMS(normalizeAngle(s.representation.lat, -90, 90));
   }
 

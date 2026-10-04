@@ -110,9 +110,9 @@ export type RukyatData = {
   moonsetAzimuth: DMS;
   illumination: number;
   age: HMS;
-  /** mar'i upper-limb altitude (moonAlt + SD☾); populated by custom hilal fns. */
+  /** mar'i upper-limb altitude (topocentric + refraction + dip + SD☾); custom hilal fns. */
   moonAltUpper?: DMS;
-  /** geometric center altitude (pre-parallax); populated by custom hilal fns. */
+  /** geocentric geometric center altitude (pre-parallax); custom hilal fns. */
   moonAltGeometric?: DMS;
   /** parallax correction P = HP·cos(h); populated by custom hilal fns. */
   moonAltParallax?: DMS;
@@ -133,11 +133,17 @@ export type ConjunctionResult = {
 };
 
 // Book's mar'i horizon: h = -(SD + 34′30″ + Dip), Dip = 0.0293·√h (h in metres).
+// Book's mar'i horizon: h = -(SD + 34′30″ + Dip), Dip = 0.0293·√h (h in metres).
+// `obs.alt` is the GEOMETRIC TOPOCENTRIC altitude (observer parallax included,
+// no refraction), so SD + refraction + dip are added exactly once on top.
 const HORIZON_REFRACTION_ALT = 34.5 / 60;
 const DIP_COEFFICIENT = 0.0293;
 
 function horizonTargetAltitude(sd: number, elevation: number): number {
-  return -(sd + HORIZON_REFRACTION_ALT + DIP_COEFFICIENT * Math.sqrt(elevation));
+  // The dip term is only defined above sea level; clamp so a valid
+  // below-sea-level observer degrades to the sea-level horizon instead of NaN.
+  const dip = DIP_COEFFICIENT * Math.sqrt(Math.max(0, elevation));
+  return -(sd + HORIZON_REFRACTION_ALT + dip);
 }
 
 function findSunset(

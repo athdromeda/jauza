@@ -7,11 +7,14 @@ import {
 } from "../../../src/utils/conjunction.js";
 import { Earth } from "../../../src/modules/earth.js";
 import { Sun } from "../../../src/modules/sun.js";
+import { Moon } from "../../../src/modules/moon.js";
 import { Time } from "../../../src/modules/time.js";
 import {
   meanEclipticOfDate,
   trueEclipticOfDate,
 } from "../../../src/modules/position.js";
+import { equatorialToHorizontal } from "../../../src/math/astrometry.js";
+import { normalizeHour } from "../../../src/math/unit.js";
 import type { AlgoConfig } from "../../../src/types.js";
 
 const sunStub: AlgoConfig = {
@@ -69,6 +72,37 @@ describe("computeHilalDetails", () => {
     // so accept ~0.005°. This still separates the book's target (-0.8416°) from
     // the old -0.833 - 0.0347·√h convention (-0.833°, Δ ≈ 0.0086°).
     expect(sun.alt).toBeCloseTo(expectedTarget, 2);
+  });
+
+  it("reports a topocentric lunar altitude (geocentric minus parallax) in the hilal pipeline", () => {
+    const res = computeHilalDetails(sunStub, moonStub(3), observer, baseResult);
+    const moon = new Earth(observer.lat, observer.lng, observer.h)
+      .at(res.sunset)
+      .observe(Moon)
+      .with(moonStub(3));
+
+    const lst = normalizeHour(moon.time.gast + observer.lng / 15);
+    const ha = lst * 15 - moon.ra.decimal;
+    const geocentric = equatorialToHorizontal(
+      { ra: moon.ra, dec: moon.dec },
+      observer.lat,
+      ha
+    );
+    // The thin crescent is near the sun (and therefore the horizon) at sunset, so
+    // the topocentric altitude is lower than the geocentric one by ~the lunar
+    // horizontal parallax (~0.95°). The pipeline must NOT be geocentric.
+    const parallax = geocentric.alt.decimal - res.moonAlt.decimal;
+    expect(parallax).toBeGreaterThan(0.6);
+    expect(parallax).toBeLessThan(1.2);
+  });
+
+  it("handles a below-sea-level observer without producing NaN", () => {
+    const deadSea = new Earth(31.5, 35.5, -430);
+    const res = computeHilalDetails(sunStub, moonStub(3), deadSea, baseResult);
+    expect(Number.isFinite(res.sunset.jd)).toBe(true);
+    expect(Number.isFinite(res.moonset.jd)).toBe(true);
+    expect(Number.isFinite(res.moonAlt.decimal)).toBe(true);
+    expect(Number.isFinite(res.sunAzimuth.decimal)).toBe(true);
   });
 });
 

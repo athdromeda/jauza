@@ -1,8 +1,8 @@
-import { equatorialToHorizontal } from "../math/astrometry.js";
-import { normalizeHour } from "../math/unit.js";
+import { topocentricHorizontal } from "../math/topocentric.js";
 import { getQibla as getQiblaDirection } from "../utils/qibla.js";
 import { Body } from "./body.js";
 import { Time } from "./time.js";
+import { trueEquatorialOfDate } from "./position.js";
 
 type CoordinateArray = [number, number] | [number, number, number];
 
@@ -52,10 +52,21 @@ export class Earth extends Body {
     return this.#qibla;
   }
 
+  /**
+   * Topocentric horizontal coordinates of the observed body: the target's
+   * true-equatorial-of-date Cartesian position minus the WGS-84 observer
+   * position, rotated into local east/north/up. Geometric (unrefracted).
+   * Prefers the published native true-equatorial pair when available.
+   */
   get horizontal() {
-    const lst = normalizeHour(this.time.gast + this.lng / 15);
-    const ha = lst * 15 - this.ra.decimal;
-    return equatorialToHorizontal({ ra: this.ra, dec: this.dec }, this.lat, ha);
+    const geo = this.geometric().position;
+    const equatorial = this.stateFor(geo, "equatorial", trueEquatorialOfDate);
+    const v = equatorial.value;
+    return topocentricHorizontal(
+      [v.x, v.y, v.z],
+      { latitude: this.lat, longitude: this.lng, elevationM: this.h },
+      this.time.gast
+    );
   }
 
   get alt() {

@@ -1,0 +1,77 @@
+[
+  {
+    "label": "jakarta-moon-2025-08-17",
+    "utc": "2025-08-17T12:00:00Z",
+    "site": {
+      "lat": -6.166667,
+      "lng": 106.816667,
+      "elevationM": 0
+    },
+    "body": "MOON",
+    "geocentric_ra_deg": 69.49138934501286,
+    "geocentric_dec_deg": 27.350890214580335,
+    "geocentric_dist_km": 371297.06002137304,
+    "expected_topocentric_alt_deg": -68.91857029025775,
+    "expected_topocentric_az_deg": 8.402079462356246
+  },
+  {
+    "label": "cibeas-moon-sunset-2025-08-17",
+    "utc": "2025-08-17T11:30:00Z",
+    "site": {
+      "lat": -7.0738889,
+      "lng": 106.5311111,
+      "elevationM": 137
+    },
+    "body": "MOON",
+    "geocentric_ra_deg": 69.16528752238844,
+    "geocentric_dec_deg": 27.30638182452565,
+    "geocentric_dist_km": 371267.60671645944,
+    "expected_topocentric_alt_deg": -69.75011523887969,
+    "expected_topocentric_az_deg": 349.76356908413567
+  },
+  {
+    "label": "reykjavik-moon-2025-08-17",
+    "utc": "2025-08-17T22:00:00Z",
+    "site": {
+      "lat": 64.1466,
+      "lng": -21.9426,
+      "elevationM": 0
+    },
+    "body": "MOON",
+    "geocentric_ra_deg": 76.05274326897919,
+    "geocentric_dec_deg": 28.078464053157123,
+    "geocentric_dist_km": 371928.3303503842,
+    "expected_topocentric_alt_deg": 2.3910024681432045,
+    "expected_topocentric_az_deg": 16.318050695506106
+  },
+  {
+    "label": "jakarta-sun-2025-08-17",
+    "utc": "2025-08-17T11:00:00Z",
+    "site": {
+      "lat": -6.166667,
+      "lng": 106.816667,
+      "elevationM": 0
+    },
+    "body": "SUN",
+    "geocentric_ra_deg": 147.09023445448773,
+    "geocentric_dec_deg": 13.2544151723703,
+    "geocentric_dist_km": 151449045.5659431,
+    "expected_topocentric_alt_deg": -2.194713870725939,
+    "expected_topocentric_az_deg": 283.0995022978459
+  },
+  {
+    "label": "reykjavik-sun-2025-08-17",
+    "utc": "2025-08-17T12:00:00Z",
+    "site": {
+      "lat": 64.1466,
+      "lng": -21.9426,
+      "elevationM": 0
+    },
+    "body": "SUN",
+    "geocentric_ra_deg": 147.12903790302482,
+    "geocentric_dec_deg": 13.241030951830966,
+    "geocentric_dist_km": 151447905.44813162,
+    "expected_topocentric_alt_deg": 36.65341392613508,
+    "expected_topocentric_az_deg": 151.7621191272417
+  }
+]

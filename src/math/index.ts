@@ -5,6 +5,7 @@ export * from "./trigonometry.js";
 export * from "./unit.js";
 export * from "./astrometry.js";
 export * from "./numerics.js";
+export * from "./topocentric.js";
 export { Vec3 } from "../modules/vec3.js";
 
 export type DMS = DMSClass;

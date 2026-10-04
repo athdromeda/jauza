@@ -26,7 +26,7 @@ export class TopocentricPositionError extends Error {
   }
 }
 
-const WGS84_A_KM = 6378.137;
+export const WGS84_A_KM = 6378.137;
 const WGS84_F = 1 / 298.257223563;
 const WGS84_E2 = WGS84_F * (2 - WGS84_F);
 

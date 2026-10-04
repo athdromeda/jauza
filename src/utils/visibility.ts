@@ -1,43 +1,62 @@
-export type YallopResult =
-  | "ZONE_A"
-  | "ZONE_B"
-  | "ZONE_C"
-  | "ZONE_D"
-  | "ZONE_E"
-  | false;
+export type YallopZone = "A" | "B" | "C" | "D" | "E" | "F";
+export type OdehZone = "A" | "B" | "C" | "D";
 
-export type OdehResult =
-  | "VISIBLE_NAKED_EYE"
-  | "VISIBLE_OPTICAL"
-  | "VISIBLE_OPTICAL_ONLY"
-  | false;
+export type YallopInput = {
+  arcvDeg: number;
+  crescentWidthArcmin: number;
+};
+export type OdehInput = YallopInput;
 
-export function yallop(arcv: number, wPrime: number): YallopResult {
+export type YallopAssessment = { q: number; zone: YallopZone };
+export type OdehAssessment = { v: number; zone: OdehZone };
+
+const assertFiniteInput = ({
+  arcvDeg,
+  crescentWidthArcmin,
+}: YallopInput) => {
+  if (!Number.isFinite(arcvDeg) || !Number.isFinite(crescentWidthArcmin)) {
+    throw new RangeError("Visibility inputs must be finite");
+  }
+  if (crescentWidthArcmin < 0) {
+    throw new RangeError("Crescent width must be non-negative");
+  }
+};
+
+const yallopZoneFor = (q: number): YallopZone => {
+  if (q > 0.216) return "A";
+  if (q > -0.014) return "B";
+  if (q > -0.16) return "C";
+  if (q > -0.232) return "D";
+  if (q > -0.293) return "E";
+  return "F";
+};
+
+export function yallop({
+  arcvDeg,
+  crescentWidthArcmin: w,
+}: YallopInput): YallopAssessment {
+  assertFiniteInput({ arcvDeg, crescentWidthArcmin: w });
   const q =
-    (arcv -
-      (11.8371 -
-        6.3226 * wPrime +
-        0.7319 * Math.pow(wPrime, 2) -
-        0.1018 * Math.pow(wPrime, 3))) /
+    (arcvDeg - (11.8371 - 6.3226 * w + 0.7319 * w ** 2 - 0.1018 * w ** 3)) /
     10;
-
-  if (q > 0.216) return "ZONE_A";
-  if (q > -0.014) return "ZONE_B";
-  if (q > -0.16) return "ZONE_C";
-  if (q > -0.232) return "ZONE_D";
-  if (q > -0.293) return "ZONE_E";
-  return false;
+  return { q, zone: yallopZoneFor(q) };
 }
 
-export function odeh(arcv: number, w: number): OdehResult {
-  const v =
-    arcv -
-    (-0.1018 * Math.pow(w, 3) + 0.7319 * Math.pow(w, 2) - 6.3226 * w + 7.1651);
+const odehZoneFor = (v: number): OdehZone => {
+  if (v >= 5.65) return "A";
+  if (v >= 2) return "B";
+  if (v >= -0.96) return "C";
+  return "D";
+};
 
-  if (v >= 5.65) return "VISIBLE_NAKED_EYE";
-  if (v >= 2.0) return "VISIBLE_OPTICAL";
-  if (v >= -0.96) return "VISIBLE_OPTICAL_ONLY";
-  return false;
+export function odeh({
+  arcvDeg,
+  crescentWidthArcmin: w,
+}: OdehInput): OdehAssessment {
+  assertFiniteInput({ arcvDeg, crescentWidthArcmin: w });
+  const v =
+    arcvDeg - (-0.1018 * w ** 3 + 0.7319 * w ** 2 - 6.3226 * w + 7.1651);
+  return { v, zone: odehZoneFor(v) };
 }
 
 export function newMabims(alt: number, arcl: number): boolean {

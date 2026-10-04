@@ -7,14 +7,20 @@ import {
 import { HijriCalendar } from "./calendar/hijri.js";
 import type { AlgoConfig } from "../types.js";
 import type { Earth } from "./earth.js";
+import { Time } from "./time.js";
+import {
+  bestTime,
+  computeVisibilityGeometry,
+  type VisibilityGeometry,
+} from "../utils/visibility-geometry.js";
 import {
   yallop,
   odeh,
   newMabims,
   diyanet,
   danjon,
-  type YallopResult,
-  type OdehResult,
+  type YallopAssessment,
+  type OdehAssessment,
 } from "../utils/visibility.js";
 
 type RukyatOptions = {};
@@ -26,17 +32,17 @@ type RukyatAlgos =
     }
   | AlgoConfig;
 
-export type VisibilityParams = {
-  arcv?: number;
-  w?: number;
-  wPrime?: number;
+export type VisibilityOptions = {
   danjonLimit?: number;
 };
 
 export type VisibilityResult = {
-  odeh: OdehResult;
+  sunset: Time;
+  moonset: Time;
+  geometry: VisibilityGeometry;
+  yallop: YallopAssessment;
+  odeh: OdehAssessment;
   newMabims: boolean;
-  yallop: YallopResult;
   danjon: boolean;
   diyanet: boolean;
 };
@@ -140,27 +146,45 @@ export class Rukyat {
     ].join("\n");
   }
 
-  visibility(params?: VisibilityParams): VisibilityResult {
-    const res = this.conjunction();
-    if (!res.hilal) {
+  visibility(options?: VisibilityOptions): VisibilityResult {
+    if (!this.#sunAlgo || !this.#moonAlgo) {
+      throw new Error("Rukyat: call with(algo) before visibility()");
+    }
+    if (!this.#observer) {
       throw new Error("Rukyat: call at(observer) before visibility()");
     }
 
-    const alt = res.hilal.moonAlt.decimal;
-    const arcl = res.hilal.elongation.decimal;
+    const result = this.conjunction();
+    if (!result.hilal) {
+      throw new Error("Rukyat: hilal data is required for visibility()");
+    }
 
-    const arcv = params?.arcv ?? alt;
-    const rad = (arcl * Math.PI) / 180;
-    const defaultW = 15.5 * (1 - Math.cos(rad));
-    const w = params?.w ?? defaultW;
-    const wPrime = params?.wPrime ?? w;
+    const time = bestTime(result.hilal.sunset, result.hilal.moonset);
+    const geometry = computeVisibilityGeometry({
+      time,
+      observer: this.#observer,
+      sunAlgo: this.#sunAlgo,
+      moonAlgo: this.#moonAlgo,
+    });
+
+    const sunsetAlt = result.hilal.moonAlt.decimal;
+    const sunsetArcl = result.hilal.elongation.decimal;
 
     return {
-      odeh: odeh(arcv, w),
-      newMabims: newMabims(alt, arcl),
-      yallop: yallop(arcv, wPrime),
-      danjon: danjon(arcl, params?.danjonLimit),
-      diyanet: diyanet(alt, arcl),
+      sunset: result.hilal.sunset,
+      moonset: result.hilal.moonset,
+      geometry,
+      yallop: yallop({
+        arcvDeg: geometry.geocentric.arcvDeg,
+        crescentWidthArcmin: geometry.yallopWidthArcmin,
+      }),
+      odeh: odeh({
+        arcvDeg: geometry.topocentric.arcvDeg,
+        crescentWidthArcmin: geometry.odehWidthArcmin,
+      }),
+      newMabims: newMabims(sunsetAlt, sunsetArcl),
+      danjon: danjon(sunsetArcl, options?.danjonLimit),
+      diyanet: diyanet(sunsetAlt, sunsetArcl),
     };
   }
 }

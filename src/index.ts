@@ -83,3 +83,8 @@ export * from "./math/index.js";
 export * from "./algos-contract.js";
 export * from "./utils/conjunction.js";
 export * from "./utils/visibility.js";
+export type {
+  VisibilityOptions,
+  VisibilityResult,
+} from "./modules/rukyat.js";
+export type { VisibilityGeometry } from "./utils/visibility-geometry.js";

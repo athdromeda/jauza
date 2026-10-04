@@ -12,6 +12,20 @@ import {
   Sun,
   Time,
   vincenty,
+  yallop,
+  odeh,
+  newMabims,
+  diyanet,
+  danjon,
+} from "../../src/index.js";
+import type {
+  OdehAssessment,
+  OdehZone,
+  VisibilityGeometry,
+  VisibilityOptions,
+  VisibilityResult,
+  YallopAssessment,
+  YallopZone,
 } from "../../src/index.js";
 import { DMS, HMS } from "../../src/math/index.js";
 
@@ -142,5 +156,48 @@ describe("Time call overloads keep full type fidelity", () => {
     Time("hello");
     // @ts-expect-error a seventh numeric argument is not a TimeOptions object
     Time(2024, 1, 1, 12, 30, 15, 42);
+  });
+});
+
+describe("visibility criteria are exported from the root", () => {
+  test("runtime classifiers are functions", () => {
+    expect(typeof yallop).toBe("function");
+    expect(typeof odeh).toBe("function");
+    expect(typeof newMabims).toBe("function");
+    expect(typeof diyanet).toBe("function");
+    expect(typeof danjon).toBe("function");
+  });
+
+  test("yallop returns a numeric q and an explicit zone", () => {
+    const result = yallop({ arcvDeg: 8.5, crescentWidthArcmin: 0.18 });
+    expect(result.q).toBeCloseTo(-0.222, 2);
+    expect(result.zone).toBe("D");
+  });
+
+  test("odeh returns a numeric v and an explicit zone", () => {
+    const result = odeh({ arcvDeg: 5, crescentWidthArcmin: 0.5 });
+    expect(result.v).toBeCloseTo(0.826, 3);
+    expect(result.zone).toBe("C");
+  });
+
+  test("assessment, options, result, and geometry types are exported", () => {
+    expectTypeOf<YallopAssessment>().toEqualTypeOf<{
+      q: number;
+      zone: YallopZone;
+    }>();
+    expectTypeOf<OdehAssessment>().toEqualTypeOf<{
+      v: number;
+      zone: OdehZone;
+    }>();
+    expectTypeOf<VisibilityOptions>().toHaveProperty("danjonLimit");
+    expectTypeOf<VisibilityResult>().toHaveProperty("geometry");
+    expectTypeOf<VisibilityResult>().toHaveProperty("yallop");
+    expectTypeOf<VisibilityResult>().toHaveProperty("odeh");
+    expectTypeOf<VisibilityResult>().toHaveProperty("sunset");
+    expectTypeOf<VisibilityResult>().toHaveProperty("moonset");
+    expectTypeOf<VisibilityGeometry>().toHaveProperty("geocentric");
+    expectTypeOf<VisibilityGeometry>().toHaveProperty("topocentric");
+    expectTypeOf<VisibilityGeometry>().toHaveProperty("yallopWidthArcmin");
+    expectTypeOf<VisibilityGeometry>().toHaveProperty("odehWidthArcmin");
   });
 });

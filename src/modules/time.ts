@@ -396,7 +396,7 @@ export class Time {
     const h12 = civil.hour % 12 || 12;
     const ampm = civil.hour < 12 ? "AM" : "PM";
 
-    const pasaran = getPasaranDay(this.jd) || "Kliwon";
+    const pasaran = getPasaranDay(this.jd, this.#timezone) || "Kliwon";
 
     const tokens: Record<string, string> = {
       YYYY: String(civil.year),
